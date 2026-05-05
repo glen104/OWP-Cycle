@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ops Rotator</title>
+    
+    <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/60660814?s=280&v=4">
+    
+    <style>
+        :root {
+            --nws-blue: #003087;
+            --z-cyan: #00e5ff;
+            --bg-dark: #06090f;
+            --panel-bg: rgba(13, 17, 23, 0.98);
+            --border: #30363d;
+        }
+
+        /* Standard CSS Reset for Firefox/Chrome Consistency */
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: var(--bg-dark); overflow: hidden; font-family: 'Segoe UI', Arial, sans-serif; color: white; }
+
+        /* Progress Bar */
+        #progress-container { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: rgba(255,255,255,0.1); z-index: 10000; }
+        #progress-bar { height: 100%; width: 0%; background: var(--z-cyan); box-shadow: 0 0 10px var(--z-cyan); transition: width 0.1s linear; }
+
+        /* Display Area */
+        #content-area { width: 100%; height: 100%; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
+        #display-frame { width: 100%; height: 100%; border: none; display: none; }
+        
+        /* Image Scaling Logic - Fixes the "Way Big" Issue */
+        #image-display { 
+            width: 100%; height: 100%; 
+            background-size: contain; 
+            background-repeat: no-repeat; 
+            background-position: center; 
+            display: none; 
+        }
+
+        /* HUD - Bottom Control Bar */
+        #hud {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--panel-bg); padding: 10px 25px; border-radius: 40px;
+            display: flex; gap: 15px; align-items: center; border: 1px solid var(--border);
+            z-index: 9999; box-shadow: 0 10px 30px rgba(0,0,0,0.8); opacity: 0.15; transition: opacity 0.3s;
+        }
+        #hud:hover { opacity: 1; }
+
+        .btn { background: #21262d; border: 1px solid var(--border); color: white; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: bold; line-height: 1.2; }
+        .btn:hover { background: var(--nws-blue); border-color: white; }
+        
+        #current-label { color: var(--z-cyan); font-weight: 900; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; min-width: 180px; text-align: center; }
+
+        /* Management Modal - Firefox Fixes Applied */
+        #manager {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 95%; max-width: 900px; background: var(--panel-bg);
+            border: 1px solid var(--border); border-radius: 15px; padding: 25px;
+            display: none; z-index: 10001; box-shadow: 0 0 100px rgba(0,0,0,0.9);
+        }
+        
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        
+        /* Scrollbar styling for Firefox */
+        .site-list-container { 
+            max-height: 400px; 
+            overflow-y: auto; 
+            scrollbar-width: thin; 
+            scrollbar-color: var(--border) transparent; 
+        }
+
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th { text-align: left; color: #8b949e; font-size: 0.7rem; text-transform: uppercase; padding: 10px; }
+        td { padding: 10px; border-bottom: 1px solid #21262d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        input { background: #0d1117; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 5px; width: 100%; font-size: 0.9rem; }
+        .input-inline { width: 60px; text-align: center; }
+        
+        .action-icon { cursor: pointer; font-size: 1.1rem; text-align: center; }
+        .delete-btn { color: #ff7b72; font-size: 0.7rem; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+
+        #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; z-index: 10000; }
+    </style>
+</head>
+<body>
+
+    <div id="progress-container"><div id="progress-bar"></div></div>
+    <div id="overlay" onclick="toggleManager()"></div>
+
+    <div id="content-area">
+        <div id="image-display"></div>
+        <iframe id="display-frame" src=""></iframe>
+    </div>
+
+    <div id="hud">
+        <button onclick="toggleManager()" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem; display: flex;">⚙️</button>
+        <span id="current-label">STANDBY</span>
+        <button class="btn" onclick="prev()">PREV</button>
+        <button class="btn" id="pause-btn" onclick="togglePause()">PAUSE</button>
+        <button class="btn" onclick="next()">NEXT</button>
+        <button class="btn" onclick="refreshCurrent()">REFRESH</button>
+    </div>
+
+    <div id="manager">
+        <div class="modal-header">
+            <h2 style="margin:0;">Ops Rotation Manager</h2>
+            <button class="btn" onclick="toggleManager()">SAVE & CLOSE</button>
+        </div>
+
+        <div class="site-list-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:50px;">Vis</th>
+                        <th>Name</th>
+                        <th>URL</th>
+                        <th style="width:80px;">Secs</th>
+                        <th style="width:80px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="site-list"></tbody>
+            </table>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px; background: #161b22; padding: 15px; border-radius: 10px; align-items: center;">
+            <input type="text" id="new-name" placeholder="Name">
+            <input type="text" id="new-url" placeholder="https://...">
+            <input type="number" id="new-duration" value="30" class="input-inline">
+            <button class="btn" onclick="addSite()" style="background: var(--nws-blue); white-space: nowrap;">ADD SITE</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA SETUP (Radar removed from default) ---
+        let sites = JSON.parse(localStorage.getItem('ops_rotator_sites')) || [
+            { name: "OWP TimeZone", url: "https://glen104.github.io/owp-time-zone/", duration: 30, visible: true },
+            { name: "OWP Flood Tour", url: "https://glen104.github.io/FloodTour/", duration: 45, visible: true },
+            { name: "Flood Hazard Outlook", url: "https://www.weather.gov/images/owp/FHO/National/National_FHO.png", duration: 20, visible: true }
+        ];
+
+        let currentIndex = -1;
+        let timeLeft = 0;
+        let isPaused = false;
+        const frame = document.getElementById('display-frame');
+        const imgDiv = document.getElementById('image-display');
+        const progressBar = document.getElementById('progress-bar');
+        const currentLabel = document.getElementById('current-label');
+
+        function save() { localStorage.setItem('ops_rotator_sites', JSON.stringify(sites)); renderList(); }
+
+        function renderList() {
+            const list = document.getElementById('site-list');
+            list.innerHTML = '';
+            sites.forEach((site, index) => {
+                const row = document.createElement('tr');
+                if(!site.visible) row.style.opacity = '0.3';
+                row.innerHTML = `
+                    <td class="action-icon" onclick="toggleVisibility(${index})">${site.visible ? '👁️' : '🚫'}</td>
+                    <td title="${site.name}"><b>${site.name}</b></td>
+                    <td style="font-size:0.7rem; color:#8b949e;" title="${site.url}">${site.url}</td>
+                    <td><input type="number" value="${site.duration}" class="input-inline" onchange="updateDuration(${index}, this.value)"></td>
+                    <td><span class="delete-btn" onclick="removeSite(${index})">DELETE</span></td>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function toggleVisibility(index) { sites[index].visible = !sites[index].visible; save(); if(!sites[index].visible && index === currentIndex) next(); }
+        function updateDuration(index, val) { sites[index].duration = parseInt(val); save(); }
+        function addSite() {
+            const name = document.getElementById('new-name').value;
+            const url = document.getElementById('new-url').value;
+            const dur = document.getElementById('new-duration').value;
+            if(name && url) {
+                sites.push({ name, url, duration: parseInt(dur), visible: true });
+                save();
+                document.getElementById('new-name').value = '';
+                document.getElementById('new-url').value = '';
+                if(currentIndex === -1) loadSite(sites.length - 1);
+            }
+        }
+        function removeSite(index) { sites.splice(index, 1); save(); if(index === currentIndex) next(); }
+
+        // --- LOADER ENGINE ---
+        function loadSite(index) {
+            const visibleSites = sites.filter(s => s.visible);
+            if (visibleSites.length === 0) { currentIndex = -1; currentLabel.innerText = "NO SITES ENABLED"; return; }
+
+            const target = sites[index];
+            currentIndex = index;
+            currentLabel.innerText = target.name;
+            timeLeft = target.duration * 1000;
+
+            // DETECT IF IMAGE (Handles the Flood Hazard PNG)
+            const isImage = target.url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i);
+
+            if(isImage) {
+                frame.style.display = "none";
+                imgDiv.style.display = "block";
+                imgDiv.style.backgroundImage = `url('${target.url}')`;
+            } else {
+                imgDiv.style.display = "none";
+                frame.style.display = "block";
+                frame.src = target.url;
+            }
+        }
+
+        function next() {
+            if (sites.filter(s => s.visible).length === 0) return;
+            let nextIdx = currentIndex;
+            do { nextIdx = (nextIdx + 1) % sites.length; } while (!sites[nextIdx].visible);
+            loadSite(nextIdx);
+        }
+
+        function prev() {
+            if (sites.filter(s => s.visible).length === 0) return;
+            let prevIdx = currentIndex;
+            do { prevIdx = (prevIdx - 1 + sites.length) % sites.length; } while (!sites[prevIdx].visible);
+            loadSite(prevIdx);
+        }
+
+        function refreshCurrent() { loadSite(currentIndex); }
+        function togglePause() { isPaused = !isPaused; document.getElementById('pause-btn').innerText = isPaused ? "RESUME" : "PAUSE"; }
+        function toggleManager() {
+            const m = document.getElementById('manager');
+            const o = document.getElementById('overlay');
+            const show = m.style.display !== 'block';
+            m.style.display = show ? 'block' : 'none';
+            o.style.display = show ? 'block' : 'none';
+        }
+
+        // --- TIMER LOOP ---
+        setInterval(() => {
+            if (!isPaused && currentIndex !== -1) {
+                timeLeft -= 100;
+                let total = sites[currentIndex].duration * 1000;
+                let percentage = ((total - timeLeft) / total) * 100;
+                progressBar.style.width = Math.min(percentage, 100) + "%";
+                if (timeLeft <= 0) next();
+            }
+        }, 100);
+
+        // --- STARTUP ---
+        renderList();
+        const start = sites.findIndex(s => s.visible);
+        loadSite(start !== -1 ? start : 0);
+    </script>
+</body>
+</html>
