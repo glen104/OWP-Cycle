@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ops Rotator Pro</title>
+    <title>Ops Rotator Pro v18</title>
     
     <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/60660814?s=280&v=4">
     
@@ -58,19 +58,17 @@
         }
         
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        
-        .site-list-container { max-height: 500px; overflow-y: auto; scrollbar-width: thin; margin-bottom: 20px; border-top: 1px solid var(--border); }
+        .site-list-container { max-height: 450px; overflow-y: auto; scrollbar-width: thin; margin-bottom: 20px; border-top: 1px solid var(--border); }
 
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { text-align: left; color: #8b949e; font-size: 0.75rem; text-transform: uppercase; padding: 15px 10px; letter-spacing: 0.5px; }
         td { padding: 10px; border-bottom: 1px solid #21262d; }
         
-        input { background: transparent; border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 6px; width: 100%; font-size: 0.9rem; transition: border-color 0.2s; }
+        input { background: transparent; border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 6px; width: 100%; font-size: 0.9rem; }
         input:focus { border-color: var(--z-cyan); outline: none; }
         .input-inline { width: 85px; text-align: center; background: rgba(0,0,0,0.2); }
         
-        .delete-btn { color: #ff7b72; font-size: 0.75rem; cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
-        .delete-btn:hover { opacity: 1; text-decoration: underline; }
+        .delete-btn { color: #ff7b72; font-size: 0.75rem; cursor: pointer; font-weight: bold; text-transform: uppercase; }
         .locked-icon { opacity: 0.4; cursor: not-allowed; font-size: 0.9rem; }
 
         #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:none; z-index: 10000; }
@@ -87,7 +85,7 @@
     </div>
 
     <div id="hud">
-        <button onclick="toggleManager()" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem;">⚙️</button>
+        <button onclick="toggleManager()" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem;" title="Settings">⚙️</button>
         <span id="current-label">STANDBY</span>
         <button class="btn" onclick="prev()">PREV</button>
         <button class="btn" id="pause-btn" onclick="togglePause()">PAUSE</button>
@@ -99,7 +97,7 @@
         <div class="modal-header">
             <div>
                 <h1 style="margin:0; font-size: 1.8rem;">Ops Rotation Manager</h1>
-                <div style="font-size: 0.8rem; color: #8b949e; margin-top: 5px;">Hard Refresh forces a cache-bust. FHO scheduled refreshes active for CDT/CST.</div>
+                <div id="debug-clock" style="font-size: 0.8rem; color: var(--z-cyan); margin-top: 5px;">Re-initializing...</div>
             </div>
             <button class="btn btn-primary" onclick="toggleManager()">Save & Close</button>
         </div>
@@ -120,30 +118,35 @@
             </table>
         </div>
 
-        <div style="display: flex; gap: 12px; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; border: 1px solid var(--border);">
-            <input type="text" id="new-name" placeholder="New Site Name">
-            <input type="text" id="new-url" placeholder="https://...">
-            <input type="number" id="new-duration" value="10" class="input-inline" title="Display duration in seconds">
-            <input type="number" id="new-refresh" value="0" class="input-inline" placeholder="Hard (m)" title="Hard refresh in minutes (0 for Never)">
-            <button class="btn btn-primary" onclick="addSite()" style="white-space: nowrap;">Add Site</button>
+        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; border: 1px solid var(--border);">
+            <div style="display: flex; gap: 12px;">
+                <input type="text" id="new-name" placeholder="Auto-names on URL paste..." list="name-suggestions">
+                <datalist id="name-suggestions"></datalist>
+                <input type="text" id="new-url" placeholder="Paste URL here..." oninput="handleUrlInput(this.value)">
+                <input type="number" id="new-duration" value="10" class="input-inline">
+                <input type="number" id="new-refresh" value="0" class="input-inline" placeholder="Hard (m)">
+                <button class="btn btn-primary" onclick="addSite()" style="white-space: nowrap;">Add Site</button>
+            </div>
         </div>
     </div>
 
     <script>
         const FHO_URL = "https://www.weather.gov/images/owp/FHO/National/National_FHO.png";
-        
-        // Updated Dark Canvas Radar Settings
-        const RADAR_CONUS = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xMDcuMDA2LDM0LjI3M10sImxvY2F0aW9uIjpudWxsLCJ6b29tIjo0LjYzNjY2NjY2NjY2NjY2Mn0sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOnRydWUsIm1lbnUiOnRydWUsInNob3J0RnVzZWRPbmx5IjpmYWxzZSwib3BhY2l0eSI6eyJhbGVydHMiOjAuOCwibG9jYWwiOjAuNiwibG9jYWxTdGF0aW9ucyI6MC44LCJuYXRpb25hbCI6MC42fX0%3D";
-        const RADAR_ALASKA = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xNTcuMjc3LDYyLjk0N10sImxvY2F0aW9uIjpudWxsLCJ6b29tIjo0LjgwMzMzMzMzMzMzMzMyN30sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOmZhbHNlLCJtZW51Ijp0cnVlLCJzaG9ydEZ1c2VkT25seSI6ZmFsc2UsIm9wYWNpdHkiOnsiYWxlcnRzIjowLjgsImxvY2FsIjowLjYsImxvY2FsU3RhdGlvbnMiOjAuOCwibmF0aW9uYWwiOjAuNn19";
+        const RADAR_CONUS = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xMDcuMDA2LDM0LjI3M10sImxvY2F0IjpudWxsLCJ6b29tIjo0LjYzNjY2NjY2NjY2NjY2Mn0sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOnRydWUsIm1lbnUiOnRydWUsInNob3J0RnVzZWRPbmx5IjpmYWxzZSwib3BhY2l0eSI6eyJhbGVydHMiOjAuOCwibG9jYWwiOjAuNiwibG9jYWxTdGF0aW9ucyI6MC44LCJuYXRpb25hbCI6MC42fX0%3D";
+        const RADAR_ALASKA = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xNTcuMjc3LDYyLjk0N10sImxvY2F0IjpudWxsLCJ6b29tIjo0LjgwMzMzMzMzMzMzMzMyN30sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOmZhbHNlLCJtZW51Ijp0cnVlLCJzaG9ydEZ1c2VkT25seSI6ZmFsc2UsIm9wYWNpdHkiOnsiYWxlcnRzIjowLjgsImxvY2FsIjowLjYsImxvY2FsU3RhdGlvbnMiOjAuOCwibmF0aW9uYWwiOjAuNn19";
+        const NWPS_URL = "https://water.noaa.gov/#@=-96.401081,38.1465724,4.1722463&b=topographic&g=obsFcst,1!1!1!0!0!0!1!0!0!0!1!1!1!0!0!0!0!0!0!0,0.5,1!1!1!1!0,0,0,true&ab=0,0,#D94B4A,1,1,1,#cccccc,1,0,0,#B243B1,1,0,0,#98E09A,1,false&a=hydrologic,0.35,true&s=0,0,0.9,0.9,false&n=false,#72afe9,0.9,0,0.9,0,0.9,true&p=false,0.75,0,7,0,1,2026,5,12,0,true&d=0,0,1,1,1,1,1,1,#006EFF,1,#006EFF,1,#006EFF,false&q=";
 
-        // Initial Data Structure v5
-        let sites = JSON.parse(localStorage.getItem('ops_rotator_sites_v5')) || [
-            { name: "Flood Hazard Outlook", url: FHO_URL, duration: 10, refresh: 0, lastHardRefresh: 0, visible: true, locked: true },
-            { name: "OWP TimeZone", url: "https://glen104.github.io/owp-time-zone/", duration: 20, refresh: 0, lastHardRefresh: 0, visible: true },
-            { name: "OWP Flood Tour", url: "https://glen104.github.io/FloodTour/", duration: 45, refresh: 0, lastHardRefresh: 0, visible: false },
-            { name: "RADAR CONUS/Hawaii", url: RADAR_CONUS, duration: 25, refresh: 0, lastHardRefresh: 0, visible: true },
-            { name: "RADAR Alaska", url: RADAR_ALASKA, duration: 10, refresh: 0, lastHardRefresh: 0, visible: true }
+        const DEFAULT_SITES = [
+            { name: "Flood Hazard Outlook", url: FHO_URL, duration: 10, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true, locked: true },
+            { name: "OWP TimeZone", url: "https://glen104.github.io/owp-time-zone/", duration: 20, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true },
+            { name: "NWPS", url: NWPS_URL, duration: 30, refresh: 10, lastSyncSlot: -1, pendingScheduledSync: false, visible: true },
+            { name: "RADAR CONUS/Hawaii", url: RADAR_CONUS, duration: 25, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true },
+            { name: "RADAR Alaska", url: RADAR_ALASKA, duration: 10, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true }
         ];
+
+        // Fail-safe storage check
+        let stored = localStorage.getItem('ops_rotator_sites_final');
+        let sites = (stored && JSON.parse(stored).length > 0) ? JSON.parse(stored) : DEFAULT_SITES;
 
         let currentIndex = -1;
         let timeLeft = 0;
@@ -155,24 +158,51 @@
         const progressBar = document.getElementById('progress-bar');
         const currentLabel = document.getElementById('current-label');
 
-        function save() { 
-            localStorage.setItem('ops_rotator_sites_v5', JSON.stringify(sites)); 
-            renderList(); 
+        function save() { localStorage.setItem('ops_rotator_sites_final', JSON.stringify(sites)); renderList(); }
+
+        function suggestNameFromUrl(url) {
+            if (!url) return "";
+            if (url.includes("National_FHO.png")) return "Flood Hazard Outlook";
+            if (url.includes("owp-time-zone")) return "OWP TimeZone";
+            if (url.includes("FloodTour")) return "OWP Flood Tour";
+            if (url.includes("radar.weather.gov")) return url.includes("WzE1Ny") ? "RADAR Alaska" : "RADAR CONUS/Hawaii";
+            if (url.includes("water.noaa.gov")) return "NWPS National Water Prediction";
+            try {
+                const u = new URL(url);
+                let part = u.pathname.split('/').filter(p => p).pop() || u.hostname;
+                part = part.replace(/\.(html|php|png|jpg|jpeg|gif)$/i, '');
+                return part.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            } catch (e) { return ""; }
+        }
+
+        function handleUrlInput(val) {
+            const nameBox = document.getElementById('new-name');
+            if (!nameBox.value) nameBox.value = suggestNameFromUrl(val);
         }
 
         function renderList() {
             const list = document.getElementById('site-list');
             list.innerHTML = '';
+            const datalist = document.getElementById('name-suggestions');
+            datalist.innerHTML = '';
+            const uniqueNames = [...new Set(sites.map(s => s.name))];
+            uniqueNames.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                datalist.appendChild(opt);
+            });
+
             sites.forEach((site, index) => {
                 const row = document.createElement('tr');
                 if(!site.visible) row.style.opacity = '0.35';
-                
                 row.innerHTML = `
                     <td style="cursor:pointer; text-align:center; font-size: 1.2rem;" onclick="toggleVisibility(${index})">${site.visible ? '👁️' : '🚫'}</td>
                     <td><input type="text" value="${site.name}" onchange="updateField(${index}, 'name', this.value)" ${site.locked ? 'readonly' : ''}></td>
                     <td><input type="text" value="${site.url}" onchange="updateField(${index}, 'url', this.value)" ${site.locked ? 'readonly' : ''}></td>
                     <td><input type="number" value="${site.duration}" class="input-inline" onchange="updateField(${index}, 'duration', this.value)"></td>
-                    <td><input type="number" value="${site.refresh || 0}" class="input-inline" onchange="updateField(${index}, 'refresh', this.value)"></td>
+                    <td>
+                        ${site.locked ? '' : `<input type="number" value="${site.refresh || 0}" class="input-inline" onchange="updateField(${index}, 'refresh', this.value)">`}
+                    </td>
                     <td style="text-align:center;">
                         ${site.locked ? '<span class="locked-icon">🔒</span>' : `<span class="delete-btn" onclick="removeSite(${index})">DELETE</span>`}
                     </td>
@@ -184,14 +214,11 @@
         function updateField(index, field, value) {
             if (field === 'duration' || field === 'refresh') value = parseInt(value) || 0;
             sites[index][field] = value;
+            if (field === 'refresh') sites[index].lastSyncSlot = -1;
             save();
         }
 
-        function toggleVisibility(index) { 
-            sites[index].visible = !sites[index].visible; 
-            save(); 
-            if(!sites[index].visible && index === currentIndex) next(); 
-        }
+        function toggleVisibility(index) { sites[index].visible = !sites[index].visible; save(); if(!sites[index].visible && index === currentIndex) next(); }
 
         function addSite() {
             const name = document.getElementById('new-name').value;
@@ -199,19 +226,14 @@
             const dur = parseInt(document.getElementById('new-duration').value) || 10;
             const ref = parseInt(document.getElementById('new-refresh').value) || 0;
             if(name && url) {
-                sites.push({ name, url, duration: dur, refresh: ref, lastHardRefresh: Date.now(), visible: true, locked: false });
+                sites.push({ name, url, duration: dur, refresh: ref, lastSyncSlot: -1, pendingScheduledSync: false, visible: true, locked: false });
                 save();
                 document.getElementById('new-name').value = '';
                 document.getElementById('new-url').value = '';
             }
         }
 
-        function removeSite(index) { 
-            if(sites[index].locked) return;
-            sites.splice(index, 1); 
-            save(); 
-            if(index === currentIndex) next(); 
-        }
+        function removeSite(index) { if(sites[index].locked) return; sites.splice(index, 1); save(); if(index === currentIndex) next(); }
 
         function loadSite(index, manualForce = false) {
             const visibleSites = sites.filter(s => s.visible);
@@ -223,34 +245,29 @@
             timeLeft = target.duration * 1000;
 
             let shouldHardRefresh = manualForce;
+            if (target.pendingScheduledSync) { shouldHardRefresh = true; sites[index].pendingScheduledSync = false; }
+
             if (!shouldHardRefresh && target.refresh > 0) {
                 const now = Date.now();
                 const intervalMs = target.refresh * 60000;
-                if (now - (target.lastHardRefresh || 0) >= intervalMs) {
-                    shouldHardRefresh = true;
-                }
+                const currentSlot = Math.floor(now / intervalMs);
+                if (currentSlot > target.lastSyncSlot) { shouldHardRefresh = true; sites[index].lastSyncSlot = currentSlot; }
             }
 
             let finalUrl = target.url;
             if (shouldHardRefresh) {
                 const separator = finalUrl.includes('?') ? '&' : '?';
                 finalUrl += `${separator}cb=${Date.now()}`;
-                sites[index].lastHardRefresh = Date.now();
-                localStorage.setItem('ops_rotator_sites_v5', JSON.stringify(sites));
+                localStorage.setItem('ops_rotator_sites_final', JSON.stringify(sites));
             }
 
             const isImage = target.url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i);
-            
             if(isImage) {
-                frame.style.display = "none";
-                frame.src = "about:blank";
-                imgDiv.style.display = "block";
-                imgDiv.style.backgroundImage = "none";
+                frame.style.display = "none"; frame.src = "about:blank";
+                imgDiv.style.display = "block"; imgDiv.style.backgroundImage = "none";
                 setTimeout(() => { imgDiv.style.backgroundImage = `url('${finalUrl}')`; }, 50);
             } else {
-                imgDiv.style.display = "none";
-                frame.style.display = "block";
-                frame.src = "about:blank"; 
+                imgDiv.style.display = "none"; frame.style.display = "block"; frame.src = "about:blank"; 
                 setTimeout(() => { frame.src = finalUrl; }, 50);
             }
         }
@@ -271,13 +288,10 @@
 
         function refreshCurrent(hard = false) { loadSite(currentIndex, hard); }
         function togglePause() { isPaused = !isPaused; document.getElementById('pause-btn').innerText = isPaused ? "RESUME" : "PAUSE"; }
-        
         function toggleManager() {
-            const m = document.getElementById('manager');
-            const o = document.getElementById('overlay');
+            const m = document.getElementById('manager'); const o = document.getElementById('overlay');
             const show = m.style.display !== 'block';
-            m.style.display = show ? 'block' : 'none';
-            o.style.display = show ? 'block' : 'none';
+            m.style.display = show ? 'block' : 'none'; o.style.display = show ? 'block' : 'none';
         }
 
         function checkScheduledRefreshes() {
@@ -288,27 +302,24 @@
 
             const isDST = (date) => {
                 const year = date.getFullYear();
-                const start = new Date(year, 2, 14);
-                const end = new Date(year, 10, 7);
-                start.setDate(14 - start.getDay());
-                end.setDate(7 - end.getDay());
+                const start = new Date(year, 2, 14); start.setDate(14 - start.getDay());
+                const end = new Date(year, 10, 7); end.setDate(7 - end.getDay());
                 return date >= start && date < end;
             };
 
             const triggerFHORefresh = () => {
                 const fhoIdx = sites.findIndex(s => s.locked === true);
                 if (fhoIdx !== -1) {
-                    if (currentIndex === fhoIdx) loadSite(fhoIdx, true);
-                    else sites[fhoIdx].lastHardRefresh = 0; 
+                    if (currentIndex === fhoIdx) { loadSite(fhoIdx, true); } 
+                    else { sites[fhoIdx].pendingScheduledSync = true; localStorage.setItem('ops_rotator_sites_final', JSON.stringify(sites)); }
                 }
                 lastScheduledRefreshMinute = currentMinute;
             };
 
-            if (isDST(now)) {
-                if (timeStr === "07:10" || timeStr === "15:10") triggerFHORefresh();
-            } else {
-                if (timeStr === "07:00" || timeStr === "14:10") triggerFHORefresh();
-            }
+            if (isDST(now)) { if (timeStr === "07:10" || timeStr === "15:10") triggerFHORefresh(); }
+            else { if (timeStr === "07:10" || timeStr === "14:10") triggerFHORefresh(); }
+
+            document.getElementById('debug-clock').innerText = "Schedule: " + timeStr + " (" + (isDST(now) ? "CDT" : "CST") + ") | Cadence active";
         }
 
         setInterval(() => {
