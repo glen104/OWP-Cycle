@@ -3,32 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ops Rotator</title>
+    <title>Ops Rotator Pro</title>
     
     <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/60660814?s=280&v=4">
     
     <style>
         :root {
             --nws-blue: #003087;
+            --nws-bright-blue: #0056b3;
             --z-cyan: #00e5ff;
             --bg-dark: #06090f;
-            --panel-bg: rgba(13, 17, 23, 0.98);
+            --panel-bg: #0d1117;
             --border: #30363d;
+            --danger: #da3633;
         }
 
-        /* Standard CSS Reset for Firefox/Chrome Consistency */
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: var(--bg-dark); overflow: hidden; font-family: 'Segoe UI', Arial, sans-serif; color: white; }
 
-        /* Progress Bar */
         #progress-container { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: rgba(255,255,255,0.1); z-index: 10000; }
         #progress-bar { height: 100%; width: 0%; background: var(--z-cyan); box-shadow: 0 0 10px var(--z-cyan); transition: width 0.1s linear; }
 
-        /* Display Area */
         #content-area { width: 100%; height: 100%; position: relative; background: #000; display: flex; align-items: center; justify-content: center; }
         #display-frame { width: 100%; height: 100%; border: none; display: none; }
         
-        /* Image Scaling Logic - Fixes the "Way Big" Issue */
         #image-display { 
             width: 100%; height: 100%; 
             background-size: contain; 
@@ -37,49 +35,45 @@
             display: none; 
         }
 
-        /* HUD - Bottom Control Bar */
         #hud {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: var(--panel-bg); padding: 10px 25px; border-radius: 40px;
+            background: rgba(13, 17, 23, 0.95); padding: 10px 25px; border-radius: 40px;
             display: flex; gap: 15px; align-items: center; border: 1px solid var(--border);
             z-index: 9999; box-shadow: 0 10px 30px rgba(0,0,0,0.8); opacity: 0.15; transition: opacity 0.3s;
         }
         #hud:hover { opacity: 1; }
 
-        .btn { background: #21262d; border: 1px solid var(--border); color: white; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: bold; line-height: 1.2; }
+        .btn { background: #21262d; border: 1px solid var(--border); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
         .btn:hover { background: var(--nws-blue); border-color: white; }
+        .btn-primary { background: var(--nws-blue); border-radius: 20px; padding: 8px 24px; text-transform: uppercase; }
+        .btn-clear { color: var(--z-cyan); border-color: var(--z-cyan); }
         
         #current-label { color: var(--z-cyan); font-weight: 900; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; min-width: 180px; text-align: center; }
 
-        /* Management Modal - Firefox Fixes Applied */
         #manager {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 95%; max-width: 900px; background: var(--panel-bg);
-            border: 1px solid var(--border); border-radius: 15px; padding: 25px;
+            width: 95%; max-width: 1200px; background: var(--panel-bg);
+            border: 1px solid var(--border); border-radius: 12px; padding: 30px;
             display: none; z-index: 10001; box-shadow: 0 0 100px rgba(0,0,0,0.9);
         }
         
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
         
-        /* Scrollbar styling for Firefox */
-        .site-list-container { 
-            max-height: 400px; 
-            overflow-y: auto; 
-            scrollbar-width: thin; 
-            scrollbar-color: var(--border) transparent; 
-        }
+        .site-list-container { max-height: 500px; overflow-y: auto; scrollbar-width: thin; margin-bottom: 20px; border-top: 1px solid var(--border); }
 
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th { text-align: left; color: #8b949e; font-size: 0.7rem; text-transform: uppercase; padding: 10px; }
-        td { padding: 10px; border-bottom: 1px solid #21262d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; color: #8b949e; font-size: 0.75rem; text-transform: uppercase; padding: 15px 10px; letter-spacing: 0.5px; }
+        td { padding: 10px; border-bottom: 1px solid #21262d; }
         
-        input { background: #0d1117; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 5px; width: 100%; font-size: 0.9rem; }
-        .input-inline { width: 60px; text-align: center; }
+        input { background: transparent; border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 6px; width: 100%; font-size: 0.9rem; transition: border-color 0.2s; }
+        input:focus { border-color: var(--z-cyan); outline: none; }
+        .input-inline { width: 85px; text-align: center; background: rgba(0,0,0,0.2); }
         
-        .action-icon { cursor: pointer; font-size: 1.1rem; text-align: center; }
-        .delete-btn { color: #ff7b72; font-size: 0.7rem; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        .delete-btn { color: #ff7b72; font-size: 0.75rem; cursor: pointer; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
+        .delete-btn:hover { opacity: 1; text-decoration: underline; }
+        .locked-icon { opacity: 0.4; cursor: not-allowed; font-size: 0.9rem; }
 
-        #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; z-index: 10000; }
+        #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:none; z-index: 10000; }
     </style>
 </head>
 <body>
@@ -93,18 +87,21 @@
     </div>
 
     <div id="hud">
-        <button onclick="toggleManager()" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem; display: flex;">⚙️</button>
+        <button onclick="toggleManager()" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem;">⚙️</button>
         <span id="current-label">STANDBY</span>
         <button class="btn" onclick="prev()">PREV</button>
         <button class="btn" id="pause-btn" onclick="togglePause()">PAUSE</button>
         <button class="btn" onclick="next()">NEXT</button>
-        <button class="btn" onclick="refreshCurrent()">REFRESH</button>
+        <button class="btn btn-clear" onclick="refreshCurrent(true)">HARD REFRESH</button>
     </div>
 
     <div id="manager">
         <div class="modal-header">
-            <h2 style="margin:0;">Ops Rotation Manager</h2>
-            <button class="btn" onclick="toggleManager()">SAVE & CLOSE</button>
+            <div>
+                <h1 style="margin:0; font-size: 1.8rem;">Ops Rotation Manager</h1>
+                <div style="font-size: 0.8rem; color: #8b949e; margin-top: 5px;">Hard Refresh forces a cache-bust. FHO scheduled refreshes active for CDT/CST.</div>
+            </div>
+            <button class="btn btn-primary" onclick="toggleManager()">Save & Close</button>
         </div>
 
         <div class="site-list-container">
@@ -114,75 +111,109 @@
                         <th style="width:50px;">Vis</th>
                         <th>Name</th>
                         <th>URL</th>
-                        <th style="width:80px;">Secs</th>
-                        <th style="width:80px;">Action</th>
+                        <th style="width:90px;">Dur (s)</th>
+                        <th style="width:130px;">Hard Refresh (m)</th>
+                        <th style="width:80px; text-align: center;">Action</th>
                     </tr>
                 </thead>
                 <tbody id="site-list"></tbody>
             </table>
         </div>
 
-        <div style="margin-top: 20px; display: flex; gap: 10px; background: #161b22; padding: 15px; border-radius: 10px; align-items: center;">
-            <input type="text" id="new-name" placeholder="Name">
+        <div style="display: flex; gap: 12px; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; border: 1px solid var(--border);">
+            <input type="text" id="new-name" placeholder="New Site Name">
             <input type="text" id="new-url" placeholder="https://...">
-            <input type="number" id="new-duration" value="30" class="input-inline">
-            <button class="btn" onclick="addSite()" style="background: var(--nws-blue); white-space: nowrap;">ADD SITE</button>
+            <input type="number" id="new-duration" value="10" class="input-inline" title="Display duration in seconds">
+            <input type="number" id="new-refresh" value="0" class="input-inline" placeholder="Hard (m)" title="Hard refresh in minutes (0 for Never)">
+            <button class="btn btn-primary" onclick="addSite()" style="white-space: nowrap;">Add Site</button>
         </div>
     </div>
 
     <script>
-        // --- DATA SETUP (Radar removed from default) ---
-        let sites = JSON.parse(localStorage.getItem('ops_rotator_sites')) || [
-            { name: "OWP TimeZone", url: "https://glen104.github.io/owp-time-zone/", duration: 30, visible: true },
-            { name: "OWP Flood Tour", url: "https://glen104.github.io/FloodTour/", duration: 45, visible: true },
-            { name: "Flood Hazard Outlook", url: "https://www.weather.gov/images/owp/FHO/National/National_FHO.png", duration: 20, visible: true }
+        const FHO_URL = "https://www.weather.gov/images/owp/FHO/National/National_FHO.png";
+        
+        // Updated Dark Canvas Radar Settings
+        const RADAR_CONUS = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xMDcuMDA2LDM0LjI3M10sImxvY2F0aW9uIjpudWxsLCJ6b29tIjo0LjYzNjY2NjY2NjY2NjY2Mn0sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOnRydWUsIm1lbnUiOnRydWUsInNob3J0RnVzZWRPbmx5IjpmYWxzZSwib3BhY2l0eSI6eyJhbGVydHMiOjAuOCwibG9jYWwiOjAuNiwibG9jYWxTdGF0aW9ucyI6MC44LCJuYXRpb25hbCI6MC42fX0%3D";
+        const RADAR_ALASKA = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xNTcuMjc3LDYyLjk0N10sImxvY2F0aW9uIjpudWxsLCJ6b29tIjo0LjgwMzMzMzMzMzMzMzMyN30sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOmZhbHNlLCJtZW51Ijp0cnVlLCJzaG9ydEZ1c2VkT25seSI6ZmFsc2UsIm9wYWNpdHkiOnsiYWxlcnRzIjowLjgsImxvY2FsIjowLjYsImxvY2FsU3RhdGlvbnMiOjAuOCwibmF0aW9uYWwiOjAuNn19";
+
+        // Initial Data Structure v5
+        let sites = JSON.parse(localStorage.getItem('ops_rotator_sites_v5')) || [
+            { name: "Flood Hazard Outlook", url: FHO_URL, duration: 10, refresh: 0, lastHardRefresh: 0, visible: true, locked: true },
+            { name: "OWP TimeZone", url: "https://glen104.github.io/owp-time-zone/", duration: 20, refresh: 0, lastHardRefresh: 0, visible: true },
+            { name: "OWP Flood Tour", url: "https://glen104.github.io/FloodTour/", duration: 45, refresh: 0, lastHardRefresh: 0, visible: false },
+            { name: "RADAR CONUS/Hawaii", url: RADAR_CONUS, duration: 25, refresh: 0, lastHardRefresh: 0, visible: true },
+            { name: "RADAR Alaska", url: RADAR_ALASKA, duration: 10, refresh: 0, lastHardRefresh: 0, visible: true }
         ];
 
         let currentIndex = -1;
         let timeLeft = 0;
         let isPaused = false;
+        let lastScheduledRefreshMinute = -1;
+
         const frame = document.getElementById('display-frame');
         const imgDiv = document.getElementById('image-display');
         const progressBar = document.getElementById('progress-bar');
         const currentLabel = document.getElementById('current-label');
 
-        function save() { localStorage.setItem('ops_rotator_sites', JSON.stringify(sites)); renderList(); }
+        function save() { 
+            localStorage.setItem('ops_rotator_sites_v5', JSON.stringify(sites)); 
+            renderList(); 
+        }
 
         function renderList() {
             const list = document.getElementById('site-list');
             list.innerHTML = '';
             sites.forEach((site, index) => {
                 const row = document.createElement('tr');
-                if(!site.visible) row.style.opacity = '0.3';
+                if(!site.visible) row.style.opacity = '0.35';
+                
                 row.innerHTML = `
-                    <td class="action-icon" onclick="toggleVisibility(${index})">${site.visible ? '👁️' : '🚫'}</td>
-                    <td title="${site.name}"><b>${site.name}</b></td>
-                    <td style="font-size:0.7rem; color:#8b949e;" title="${site.url}">${site.url}</td>
-                    <td><input type="number" value="${site.duration}" class="input-inline" onchange="updateDuration(${index}, this.value)"></td>
-                    <td><span class="delete-btn" onclick="removeSite(${index})">DELETE</span></td>
+                    <td style="cursor:pointer; text-align:center; font-size: 1.2rem;" onclick="toggleVisibility(${index})">${site.visible ? '👁️' : '🚫'}</td>
+                    <td><input type="text" value="${site.name}" onchange="updateField(${index}, 'name', this.value)" ${site.locked ? 'readonly' : ''}></td>
+                    <td><input type="text" value="${site.url}" onchange="updateField(${index}, 'url', this.value)" ${site.locked ? 'readonly' : ''}></td>
+                    <td><input type="number" value="${site.duration}" class="input-inline" onchange="updateField(${index}, 'duration', this.value)"></td>
+                    <td><input type="number" value="${site.refresh || 0}" class="input-inline" onchange="updateField(${index}, 'refresh', this.value)"></td>
+                    <td style="text-align:center;">
+                        ${site.locked ? '<span class="locked-icon">🔒</span>' : `<span class="delete-btn" onclick="removeSite(${index})">DELETE</span>`}
+                    </td>
                 `;
                 list.appendChild(row);
             });
         }
 
-        function toggleVisibility(index) { sites[index].visible = !sites[index].visible; save(); if(!sites[index].visible && index === currentIndex) next(); }
-        function updateDuration(index, val) { sites[index].duration = parseInt(val); save(); }
+        function updateField(index, field, value) {
+            if (field === 'duration' || field === 'refresh') value = parseInt(value) || 0;
+            sites[index][field] = value;
+            save();
+        }
+
+        function toggleVisibility(index) { 
+            sites[index].visible = !sites[index].visible; 
+            save(); 
+            if(!sites[index].visible && index === currentIndex) next(); 
+        }
+
         function addSite() {
             const name = document.getElementById('new-name').value;
             const url = document.getElementById('new-url').value;
-            const dur = document.getElementById('new-duration').value;
+            const dur = parseInt(document.getElementById('new-duration').value) || 10;
+            const ref = parseInt(document.getElementById('new-refresh').value) || 0;
             if(name && url) {
-                sites.push({ name, url, duration: parseInt(dur), visible: true });
+                sites.push({ name, url, duration: dur, refresh: ref, lastHardRefresh: Date.now(), visible: true, locked: false });
                 save();
                 document.getElementById('new-name').value = '';
                 document.getElementById('new-url').value = '';
-                if(currentIndex === -1) loadSite(sites.length - 1);
             }
         }
-        function removeSite(index) { sites.splice(index, 1); save(); if(index === currentIndex) next(); }
 
-        // --- LOADER ENGINE ---
-        function loadSite(index) {
+        function removeSite(index) { 
+            if(sites[index].locked) return;
+            sites.splice(index, 1); 
+            save(); 
+            if(index === currentIndex) next(); 
+        }
+
+        function loadSite(index, manualForce = false) {
             const visibleSites = sites.filter(s => s.visible);
             if (visibleSites.length === 0) { currentIndex = -1; currentLabel.innerText = "NO SITES ENABLED"; return; }
 
@@ -191,17 +222,36 @@
             currentLabel.innerText = target.name;
             timeLeft = target.duration * 1000;
 
-            // DETECT IF IMAGE (Handles the Flood Hazard PNG)
-            const isImage = target.url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i);
+            let shouldHardRefresh = manualForce;
+            if (!shouldHardRefresh && target.refresh > 0) {
+                const now = Date.now();
+                const intervalMs = target.refresh * 60000;
+                if (now - (target.lastHardRefresh || 0) >= intervalMs) {
+                    shouldHardRefresh = true;
+                }
+            }
 
+            let finalUrl = target.url;
+            if (shouldHardRefresh) {
+                const separator = finalUrl.includes('?') ? '&' : '?';
+                finalUrl += `${separator}cb=${Date.now()}`;
+                sites[index].lastHardRefresh = Date.now();
+                localStorage.setItem('ops_rotator_sites_v5', JSON.stringify(sites));
+            }
+
+            const isImage = target.url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i);
+            
             if(isImage) {
                 frame.style.display = "none";
+                frame.src = "about:blank";
                 imgDiv.style.display = "block";
-                imgDiv.style.backgroundImage = `url('${target.url}')`;
+                imgDiv.style.backgroundImage = "none";
+                setTimeout(() => { imgDiv.style.backgroundImage = `url('${finalUrl}')`; }, 50);
             } else {
                 imgDiv.style.display = "none";
                 frame.style.display = "block";
-                frame.src = target.url;
+                frame.src = "about:blank"; 
+                setTimeout(() => { frame.src = finalUrl; }, 50);
             }
         }
 
@@ -219,8 +269,9 @@
             loadSite(prevIdx);
         }
 
-        function refreshCurrent() { loadSite(currentIndex); }
+        function refreshCurrent(hard = false) { loadSite(currentIndex, hard); }
         function togglePause() { isPaused = !isPaused; document.getElementById('pause-btn').innerText = isPaused ? "RESUME" : "PAUSE"; }
+        
         function toggleManager() {
             const m = document.getElementById('manager');
             const o = document.getElementById('overlay');
@@ -229,7 +280,37 @@
             o.style.display = show ? 'block' : 'none';
         }
 
-        // --- TIMER LOOP ---
+        function checkScheduledRefreshes() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            const currentMinute = now.getMinutes();
+            if (currentMinute === lastScheduledRefreshMinute) return;
+
+            const isDST = (date) => {
+                const year = date.getFullYear();
+                const start = new Date(year, 2, 14);
+                const end = new Date(year, 10, 7);
+                start.setDate(14 - start.getDay());
+                end.setDate(7 - end.getDay());
+                return date >= start && date < end;
+            };
+
+            const triggerFHORefresh = () => {
+                const fhoIdx = sites.findIndex(s => s.locked === true);
+                if (fhoIdx !== -1) {
+                    if (currentIndex === fhoIdx) loadSite(fhoIdx, true);
+                    else sites[fhoIdx].lastHardRefresh = 0; 
+                }
+                lastScheduledRefreshMinute = currentMinute;
+            };
+
+            if (isDST(now)) {
+                if (timeStr === "07:10" || timeStr === "15:10") triggerFHORefresh();
+            } else {
+                if (timeStr === "07:00" || timeStr === "14:10") triggerFHORefresh();
+            }
+        }
+
         setInterval(() => {
             if (!isPaused && currentIndex !== -1) {
                 timeLeft -= 100;
@@ -238,9 +319,9 @@
                 progressBar.style.width = Math.min(percentage, 100) + "%";
                 if (timeLeft <= 0) next();
             }
+            checkScheduledRefreshes();
         }, 100);
 
-        // --- STARTUP ---
         renderList();
         const start = sites.findIndex(s => s.visible);
         loadSite(start !== -1 ? start : 0);
