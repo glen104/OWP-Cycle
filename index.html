@@ -3,301 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ops Rotator Pro v27</title>
-    
+    <title>Ops Rotator Pro v54</title>
     <link rel="icon" type="image/png" href="https://avatars.githubusercontent.com/u/60660814?s=280&v=4">
-    
     <style>
         :root {
-            --nws-blue: #003087;
-            --nws-bright-blue: #0056b3;
-            --z-cyan: #00e5ff;
-            --bg-dark: #06090f;
-            --panel-bg: #0d1117;
-            --border: #30363d;
-            --danger: #da3633;
+            --nws-blue: #003087; --z-cyan: #00e5ff; --bg-dark: #06090f;
+            --panel-bg: #0d1117; --border: #30363d; --danger: #da3633;
+            --warning: #ffca28; --success: #238636;
         }
-
         * { box-sizing: border-box; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: var(--bg-dark); overflow: hidden; font-family: 'Segoe UI', Arial, sans-serif; color: white; }
-
-        #progress-container { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: rgba(255,255,255,0.1); z-index: 10000; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #000; overflow: hidden; font-family: 'Segoe UI', Arial, sans-serif; color: white; }
+        #progress-container { position: absolute; top: 0; left: 0; width: 100%; height: 4px; background: rgba(255,255,255,0.1); z-index: 10001; }
         #progress-bar { height: 100%; width: 0%; background: var(--z-cyan); box-shadow: 0 0 10px var(--z-cyan); transition: width 0.1s linear; }
-
-        #content-area { width: 100%; height: 100%; position: relative; background: #000; }
-        
-        .site-panel {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            border: none; background-color: #000;
-            opacity: 0; pointer-events: none; z-index: 1;
-            transition: opacity 0.3s;
-        }
-        .site-panel.active { opacity: 1; pointer-events: auto; z-index: 10; }
+        #content-area { width: 100%; height: 100%; position: absolute; top:0; left:0; background: #000; z-index: 1; }
+        .site-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; background-color: #000; opacity: 0; pointer-events: none; transition: opacity 0.4s; z-index: 2; }
+        .site-panel.active { opacity: 1; pointer-events: auto; z-index: 3; }
         .img-panel { background-size: contain; background-repeat: no-repeat; background-position: center; }
-
+        #task-alert-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 25vh;
+            z-index: 999999; display: none; flex-direction: column;
+            align-items: center; justify-content: center;
+            backdrop-filter: blur(10px); border-bottom: 2px solid rgba(255,255,255,0.3);
+            animation: alert-pulse 1.2s infinite; pointer-events: none;
+        }
+        @keyframes alert-pulse { 0% { background-color: rgba(150, 0, 0, 0.25); } 50% { background-color: rgba(255, 0, 0, 0.45); } 100% { background-color: rgba(150, 0, 0, 0.25); } }
+        #task-alert-text { font-size: 3.2rem; font-weight: 900; text-transform: uppercase; text-shadow: 2px 2px 15px black; text-align: center; }
         #hud {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             background: rgba(13, 17, 23, 0.95); padding: 10px 25px; border-radius: 40px;
             display: flex; gap: 15px; align-items: center; border: 1px solid var(--border);
-            z-index: 9999; box-shadow: 0 10px 30px rgba(0,0,0,0.8); opacity: 0.15; transition: opacity 0.3s;
+            z-index: 10005; box-shadow: 0 10px 30px rgba(0,0,0,0.8); opacity: 0.25; transition: opacity 0.3s;
         }
         #hud:hover { opacity: 1; }
-
+        #current-label { color: var(--z-cyan); font-weight: 900; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; min-width: 180px; text-align: center; }
         .btn { background: #21262d; border: 1px solid var(--border); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
         .btn:hover { background: var(--nws-blue); border-color: white; }
-        
-        #current-label { color: var(--z-cyan); font-weight: 900; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; min-width: 180px; text-align: center; }
-
         #manager {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 95%; max-width: 1200px; background: var(--panel-bg);
-            border: 1px solid var(--border); border-radius: 12px; padding: 30px;
-            display: none; z-index: 10001; box-shadow: 0 0 100px rgba(0,0,0,0.9);
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 95%; max-width: 1100px; background: var(--panel-bg);
+            border: 1px solid var(--border); border-radius: 15px; padding: 25px;
+            display: none; z-index: 30000; box-shadow: 0 0 100px rgba(0,0,0,0.9); max-height: 85vh; overflow-y: auto;
         }
-        
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        .site-list-container { max-height: 450px; overflow-y: auto; scrollbar-width: thin; margin-bottom: 20px; border-top: 1px solid var(--border); }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { text-align: left; color: #8b949e; font-size: 0.75rem; text-transform: uppercase; padding: 15px 10px; letter-spacing: 0.5px; }
-        td { padding: 10px; border-bottom: 1px solid #21262d; }
-        
-        input { background: transparent; border: 1px solid var(--border); color: white; padding: 8px 12px; border-radius: 6px; width: 100%; font-size: 0.9rem; }
-        input:focus { border-color: var(--z-cyan); outline: none; }
-        .input-inline { width: 85px; text-align: center; background: rgba(0,0,0,0.2); }
-        
-        .delete-btn { color: #ff7b72; font-size: 0.75rem; cursor: pointer; font-weight: bold; text-transform: uppercase; }
-        .locked-icon { opacity: 0.4; cursor: not-allowed; font-size: 0.9rem; }
-
-        #overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:none; z-index: 10000; }
+        #modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; z-index: 25000; }
+        .tab-bar { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .tab-btn { background: transparent; border: none; color: #8b949e; padding: 10px 25px; font-weight: bold; cursor: pointer; border-radius: 8px; }
+        .tab-btn.active { background: var(--nws-blue); color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th { text-align: left; color: #8b949e; font-size: 0.75rem; text-transform: uppercase; padding: 10px; }
+        td { padding: 8px; border-bottom: 1px solid #21262d; }
+        select, input { background: #161b22 !important; color: #ffffff !important; border: 1px solid var(--border); padding: 8px; border-radius: 6px; }
+        .input-inline { width: 75px; text-align: center; }
     </style>
 </head>
-<body>
+<body onclick="initAudio()">
 
     <div id="progress-container"><div id="progress-bar"></div></div>
-    <div id="overlay" onclick="toggleManager()"></div>
+    <div id="modal-overlay" onclick="toggleManager()"></div>
+
+    <div id="task-alert-overlay">
+        <h2 id="task-alert-text">TASK ALERT</h2>
+        <div style="font-size: 0.75rem; opacity: 0.8; letter-spacing: 1px; margin-top: 5px;">AUTO-DISMISSING IN 10 SECONDS</div>
+    </div>
 
     <div id="content-area"></div>
 
     <div id="hud">
-        <button onclick="toggleManager()" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem;" title="Settings">⚙️</button>
+        <button onclick="toggleManager()" style="background:transparent; border:none; cursor:pointer; font-size:1.2rem;">⚙️</button>
+        <span id="audio-status-hud" title="Click to fix audio">🔇</span>
         <span id="current-label">STANDBY</span>
         <button class="btn" onclick="prev()">PREV</button>
         <button class="btn" id="pause-btn" onclick="togglePause()">PAUSE</button>
         <button class="btn" onclick="next()">NEXT</button>
-        <button class="btn btn-clear" onclick="refreshCurrent(true)" style="color: var(--z-cyan); border-color: var(--z-cyan);">HARD REFRESH</button>
+        <button class="btn" onclick="hardRefreshCurrent()" style="color: var(--z-cyan); border-color: var(--z-cyan);">HARD REFRESH</button>
     </div>
 
     <div id="manager">
-        <div class="modal-header">
-            <div>
-                <h1 style="margin:0; font-size: 1.8rem;">Ops Rotation Manager</h1>
-                <div id="debug-clock" style="font-size: 0.8rem; color: var(--z-cyan); margin-top: 5px;">Sync Status: Initializing...</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <div><h1 style="margin:0; font-size:1.5rem;">Ops Manager v54</h1><div id="debug-clock" style="font-size: 0.8rem; color: var(--z-cyan); margin-top:4px;">Ready</div></div>
+            <button class="btn" onclick="toggleManager()" style="background:var(--nws-blue);">SAVE & CLOSE</button>
+        </div>
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('rotator', this)">ROTATOR</button>
+            <button class="tab-btn" onclick="switchTab('scheduler', this)">SCHEDULER</button>
+        </div>
+        <div id="tab-rotator" class="tab-content active">
+            <table><thead><tr><th>Vis</th><th>Name</th><th>URL</th><th>Dur(s)</th><th>Refresh(m)</th><th>Action</th></tr></thead><tbody id="site-list"></tbody></table>
+            <div style="background:rgba(255,255,255,0.03); padding:15px; border-radius:12px; display:flex; gap:10px;">
+                <input type="text" id="new-name" placeholder="Name" style="flex:1;">
+                <input type="text" id="new-url" placeholder="URL" style="flex:2;" oninput="handleUrlInput(this.value)">
+                <input type="number" id="new-duration" value="15" class="input-inline">
+                <input type="number" id="new-refresh" value="0" class="input-inline">
+                <button class="btn" onclick="addSite()" style="background:var(--nws-blue);">ADD</button>
             </div>
-            <button class="btn btn-primary" onclick="toggleManager()" style="background: var(--nws-blue); border-radius: 20px; padding: 8px 24px; text-transform: uppercase;">Save & Close</button>
         </div>
-
-        <div class="site-list-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width:50px;">Vis</th>
-                        <th>Name</th>
-                        <th>URL</th>
-                        <th style="width:90px;">Dur (s)</th>
-                        <th style="width:130px;">Hard Refresh (m)</th>
-                        <th style="width:80px; text-align: center;">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="site-list"></tbody>
-            </table>
-        </div>
-
-        <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px; border: 1px solid var(--border);">
-            <div style="display: flex; gap: 12px;">
-                <input type="text" id="new-name" placeholder="Auto-names on URL paste..." list="name-suggestions">
-                <datalist id="name-suggestions"></datalist>
-                <input type="text" id="new-url" placeholder="Paste URL here..." oninput="handleUrlInput(this.value)">
-                <input type="number" id="new-duration" value="10" class="input-inline">
-                <input type="number" id="new-refresh" value="0" class="input-inline" placeholder="Hard (m)">
-                <button class="btn btn-primary" onclick="addSite()" style="background: var(--nws-blue); border-radius: 20px; padding: 8px 24px; text-transform: uppercase; white-space: nowrap;">Add Site</button>
+        <div id="tab-scheduler" class="tab-content">
+            <div style="background:rgba(255,202,40,0.1); padding:15px; border-radius:10px; margin-bottom:15px; display:flex; align-items:center; gap:15px;">
+                <span style="font-weight:bold; color:var(--warning);">Alert Sound:</span>
+                <select id="global-sound-select" onchange="updateGlobalSound(this.value)" style="flex:1;">
+                    <option value="Taco Bell Bong">Taco Bell Bong (Rich)</option>
+                    <option value="Submarine Horn">Submarine Horn (Loud)</option>
+                    <option value="Triple Beep">Triple Beep (Urgent)</option>
+                    <option value="Ding Dong">Classic Ding-Dong</option>
+                    <option value="Sonar Ping">Sonar Ping</option>
+                    <option value="Digital Seq">Digital Sequence</option>
+                    <option value="Simple Ding">Simple Ding</option>
+                    <option value="Emergency Siren">Emergency Siren</option>
+                    <option value="None">None (Silent)</option>
+                </select>
+                <button class="btn" onclick="playSelectedTone()">Listen</button>
+            </div>
+            <table id="task-list-table"><thead><tr><th>Time</th><th>Message</th><th>Freq</th><th>Range</th><th>Action</th></tr></thead><tbody id="task-list"></tbody></table>
+            <div style="background:rgba(255,255,255,0.03); padding:15px; border-radius:12px; display:flex; gap:10px; align-items:center;">
+                <input type="time" id="task-time" value="07:00">
+                <input type="text" id="task-desc" placeholder="Message..." style="flex:1;">
+                <select id="task-type" onchange="toggleTaskDates()"><option value="daily">Daily</option><option value="weekday">Weekday</option><option value="seasonal">Seasonal</option></select>
+                <div id="task-date-inputs" style="display:none; gap:5px;"><input type="text" id="task-start" placeholder="MM-DD"> to <input type="text" id="task-end" placeholder="MM-DD"></div>
+                <button class="btn" onclick="addTask()" style="background: var(--nws-blue);">ADD</button>
             </div>
         </div>
     </div>
 
     <script>
-        const FHO_URL = "https://www.weather.gov/images/owp/FHO/National/National_FHO.png";
+        let audioCtx = null;
         const RADAR_CONUS = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xMDcuMDA2LDM0LjI3M10sImxvY2F0IjpudWxsLCJ6b29tIjo0LjYzNjY2NjY2NjY2NjY2Mn0sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOnRydWUsIm1lbnUiOnRydWUsInNob3J0RnVzZWRPbmx5IjpmYWxzZSwib3BhY2l0eSI6eyJhbGVydHMiOjAuOCwibG9jYWwiOjAuNiwibG9jYWxTdGF0aW9ucyI6MC44LCJuYXRpb25hbCI6MC42fX0%3D";
         const RADAR_ALASKA = "https://radar.weather.gov/?settings=v1_eyJhZ2VuZGEiOnsiaWQiOm51bGwsImNlbnRlciI6Wy0xNTcuMjc3LDYyLjk0N10sImxvY2F0IjpudWxsLCJ6b29tIjo0LjgwMzMzMzMzMzMzMzMyN30sImFuaW1hdGluZyI6dHJ1ZSwiYmFzZSI6ImRhcmtjYW52YXMiLCJhcnRjYyI6ZmFsc2UsImNvdW50eSI6dHJ1ZSwiY3dhIjpmYWxzZSwicmZjIjpmYWxzZSwic3RhdGUiOnRydWUsIm1lbnUiOnRydWUsInNob3J0RnVzZWRPbmx5IjpmYWxzZSwib3BhY2l0eSI6eyJhbGVydHMiOjAuOCwibG9jYWwiOjAuNiwibG9jYWxTdGF0aW9ucyI6MC44LCJuYXRpb25hbCI6MC42fX0%3D";
         const NWPS_URL = "https://water.noaa.gov/#@=-96.401081,38.1465724,4.1722463&b=topographic&g=obsFcst,1!1!1!0!0!0!1!0!0!0!1!1!1!0!0!0!0!0!0!0,0.5,1!1!1!1!0,0,0,true&ab=0,0,#D94B4A,1,1,1,#cccccc,1,0,0,#B243B1,1,0,0,#98E09A,1,false&a=hydrologic,0.35,true&s=0,0,0.9,0.9,false&n=false,#72afe9,0.9,0,0.9,0,0.9,true&p=false,0.75,0,7,0,1,2026,5,12,0,true&d=0,0,1,1,1,1,1,1,#006EFF,1,#006EFF,1,#006EFF,false&q=";
 
-        const DEFAULT_SITES = [
-            { id: 100, name: "Flood Hazard Outlook", url: FHO_URL, duration: 10, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, lastHardSyncTime: "None", visible: true, locked: true },
-            { id: 101, name: "OWP TimeZone", url: "https://glen104.github.io/owp-time-zone/", duration: 20, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true },
-            { id: 102, name: "NWPS", url: NWPS_URL, duration: 30, refresh: 10, lastSyncSlot: -1, pendingScheduledSync: false, visible: true },
-            { id: 103, name: "RADAR CONUS/Hawaii", url: RADAR_CONUS, duration: 25, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true },
-            { id: 104, name: "RADAR Alaska", url: RADAR_ALASKA, duration: 10, refresh: 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true }
+        let sites = JSON.parse(localStorage.getItem('ROT_SITES_v54')) || [
+            { id: 100, name: "Flood Hazard Outlook", url: "https://www.weather.gov/images/owp/FHO/National/National_FHO.png", duration: 10, refresh: 0, lastSyncSlot: -1, visible: true, locked: true, pendingScheduledSync: false },
+            { id: 101, name: "OWP TimeZone", url: "https://glen104.github.io/owp-time-zone/", duration: 20, refresh: 0, lastSyncSlot: -1, visible: true },
+            { id: 102, name: "NWPS", url: NWPS_URL, duration: 30, refresh: 10, lastSyncSlot: -1, visible: true },
+            { id: 103, name: "RADAR CONUS/Hawaii", url: RADAR_CONUS, duration: 25, refresh: 0, lastSyncSlot: -1, visible: true },
+            { id: 104, name: "RADAR Alaska", url: RADAR_ALASKA, duration: 10, refresh: 0, lastSyncSlot: -1, visible: true }
         ];
+        let tasks = JSON.parse(localStorage.getItem('ROT_TASKS_v54')) || [
+            { id: 1, time: "06:55", desc: "MORNING FHO DUE SOON", type: "daily" },
+            { id: 2, time: "14:55", desc: "AFTERNOON FHO DUE SOON", type: "daily", tzAware: "CDT" },
+            { id: 3, time: "13:55", desc: "AFTERNOON FHO DUE SOON", type: "daily", tzAware: "CST" },
+            { id: 4, time: "07:55", desc: "WPC CALL IN 5 MINUTES", type: "daily" },
+            { id: 5, time: "08:50", desc: "WPOD HUDDLE IN 5 MINUTES", type: "weekday" },
+            { id: 6, time: "11:40", desc: "DAILY TROPICAL CALL IN 5 MINUTES", type: "seasonal", start: "05-15", end: "10-31" }
+        ];
+        let globalTone = localStorage.getItem('ROT_SOUND_v54') || "Taco Bell Bong";
+        let currentIndex = -1, timeLeft = 0, isPaused = false, lastTriggerMin = "", lastSyncKey = "";
 
-        let stored = localStorage.getItem('ops_rotator_sites_final_v4');
-        let sites = (stored) ? JSON.parse(stored) : DEFAULT_SITES;
-
-        let currentIndex = -1;
-        let timeLeft = 0;
-        let isPaused = false;
-        let lastScheduledRefreshMinute = -1;
-
-        const contentArea = document.getElementById('content-area');
-        const progressBar = document.getElementById('progress-bar');
-        const currentLabel = document.getElementById('current-label');
-
-        function save() { localStorage.setItem('ops_rotator_sites_final_v4', JSON.stringify(sites)); renderList(); syncDisplays(); }
-
-        function syncDisplays() {
-            sites.forEach((site) => {
-                let panel = document.getElementById(`panel-${site.id}`);
-                const isImage = site.url.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i);
-                if (!panel) {
-                    if (isImage) { panel = document.createElement('div'); panel.className = 'site-panel img-panel'; panel.style.backgroundImage = `url('${site.url}')`; }
-                    else { panel = document.createElement('iframe'); panel.className = 'site-panel'; panel.src = site.url; }
-                    panel.id = `panel-${site.id}`;
-                    contentArea.appendChild(panel);
-                } else if (panel.tagName === 'IFRAME' && panel.dataset.rawUrl !== site.url) {
-                    panel.src = site.url; panel.dataset.rawUrl = site.url;
-                }
-            });
-            Array.from(contentArea.children).forEach(p => { if (!sites.find(s => `panel-${s.id}` === p.id)) p.remove(); });
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            document.getElementById('audio-status-hud').innerText = "🔔"; document.getElementById('audio-status-hud').style.color = "var(--success)";
         }
 
-        function suggestNameFromUrl(url) {
-            if (!url) return "";
-            if (url.includes("National_FHO.png")) return "Flood Hazard Outlook";
-            if (url.includes("owp-time-zone")) return "OWP TimeZone";
-            if (url.includes("radar.weather.gov")) return url.includes("WzE1Ny") ? "RADAR Alaska" : "RADAR CONUS/Hawaii";
-            if (url.includes("water.noaa.gov")) return "NWPS National Water Prediction";
-            try { const u = new URL(url); let part = u.pathname.split('/').filter(p => p).pop() || u.hostname; part = part.replace(/\.(html|php|png|jpg|jpeg|gif)$/i, ''); return part.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); } catch (e) { return ""; }
-        }
+        function playSelectedTone() {
+            initAudio(); if (globalTone === "None" || !audioCtx) return;
+            const now = audioCtx.currentTime; const gain = audioCtx.createGain(); gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.8, now + 0.02); // HIGH VOLUME
 
-        function handleUrlInput(val) { const nameBox = document.getElementById('new-name'); if (!nameBox.value) nameBox.value = suggestNameFromUrl(val); }
-
-        function renderList() {
-            const list = document.getElementById('site-list');
-            list.innerHTML = '';
-            const datalist = document.getElementById('name-suggestions');
-            datalist.innerHTML = [...new Set(sites.map(s => s.name))].map(n => `<option value="${n}">`).join('');
-            sites.forEach((site, index) => {
-                const row = document.createElement('tr');
-                if(!site.visible) row.style.opacity = '0.35';
-                row.innerHTML = `
-                    <td style="cursor:pointer; text-align:center; font-size: 1.2rem;" onclick="toggleVisibility(${index})">${site.visible ? '👁️' : '🚫'}</td>
-                    <td><input type="text" value="${site.name}" onchange="updateField(${index}, 'name', this.value)" ${site.locked ? 'readonly' : ''}></td>
-                    <td><input type="text" value="${site.url}" onchange="updateField(${index}, 'url', this.value)" ${site.locked ? 'readonly' : ''}></td>
-                    <td><input type="number" value="${site.duration}" class="input-inline" onchange="updateField(${index}, 'duration', this.value)"></td>
-                    <td>${site.locked ? `<span style="font-size: 0.65rem; color: #8b949e;">Sync: ${site.lastHardSyncTime || 'None'}</span>` : `<input type="number" value="${site.refresh || 0}" class="input-inline" onchange="updateField(${index}, 'refresh', this.value)">`}</td>
-                    <td style="text-align:center;">${site.locked ? '🔒' : `<span class="delete-btn" onclick="removeSite(${index})">DELETE</span>`}</td>
-                `;
-                list.appendChild(row);
-            });
-        }
-
-        function updateField(index, field, value) {
-            if (field === 'duration' || field === 'refresh') value = parseInt(value) || 0;
-            sites[index][field] = value;
-            if (field === 'refresh') sites[index].lastSyncSlot = -1;
-            save();
-        }
-
-        function toggleVisibility(index) { sites[index].visible = !sites[index].visible; save(); if(!sites[index].visible && index === currentIndex) next(); }
-        function addSite() {
-            const name = document.getElementById('new-name').value;
-            const url = document.getElementById('new-url').value;
-            if(name && url) {
-                sites.push({ id: Date.now(), name, url, duration: parseInt(document.getElementById('new-duration').value) || 10, refresh: parseInt(document.getElementById('new-refresh').value) || 0, lastSyncSlot: -1, pendingScheduledSync: false, visible: true, locked: false });
-                save(); document.getElementById('new-name').value = ''; document.getElementById('new-url').value = '';
+            if (globalTone === "Taco Bell Bong") {
+                [155, 311, 466].forEach(f => { const o = audioCtx.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(f, now); o.connect(gain); o.start(); o.stop(now + 3); });
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 3);
+            } else if (globalTone === "Ding Dong") {
+                const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(659, now); o.frequency.setValueAtTime(523, now + 0.5); o.connect(gain); o.start(); o.stop(now + 1.5);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+            } else if (globalTone === "Submarine Horn") {
+                const o = audioCtx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(120, now); o.frequency.setValueAtTime(120, now + 0.5); o.frequency.setValueAtTime(0, now + 0.55); o.frequency.setValueAtTime(120, now + 0.65); o.connect(gain); o.start(); o.stop(now + 1.5);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+            } else if (globalTone === "Triple Beep") {
+                const o = audioCtx.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(1000, now);
+                [0.2, 0.4, 0.6].forEach(t => { gain.gain.setValueAtTime(0.8, now + t); gain.gain.setValueAtTime(0, now + t + 0.1); });
+                o.connect(gain); o.start(); o.stop(now + 1);
+            } else if (globalTone === "Sonar Ping") {
+                const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(1500, now); o.connect(gain); o.start(); o.stop(now + 0.8);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+            } else if (globalTone === "Digital Seq") {
+                const o = audioCtx.createOscillator(); o.type = 'square';
+                [440, 554, 659, 880].forEach((f, i) => o.frequency.setValueAtTime(f, now + (i * 0.1)));
+                o.connect(gain); o.start(); o.stop(now + 0.5);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+            } else if (globalTone === "Emergency Siren") {
+                const o = audioCtx.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(800, now);
+                for(let i=0; i<4; i++){ o.frequency.exponentialRampToValueAtTime(1200, now + (i*0.5) + 0.25); o.frequency.exponentialRampToValueAtTime(800, now + (i*0.5) + 0.5); }
+                o.connect(gain); o.start(); o.stop(now + 2.1);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.1);
+            } else { // Simple Ding
+                const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(880, now); o.frequency.exponentialRampToValueAtTime(1046, now + 0.1); o.connect(gain); o.start(); o.stop(now + 0.8);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
             }
         }
-        function removeSite(index) { if(sites[index].locked) return; sites.splice(index, 1); save(); if(index === currentIndex) next(); }
 
-        // --- NUKE & PAVE HARD REFRESH ---
-        function loadSite(index, manualForce = false) {
-            const visibleSites = sites.filter(s => s.visible);
-            if (visibleSites.length === 0) { currentIndex = -1; currentLabel.innerText = "NO SITES ENABLED"; return; }
-            const target = sites[index];
-            currentIndex = index;
-            currentLabel.innerText = target.name;
+        function save() { localStorage.setItem('ROT_SITES_v54', JSON.stringify(sites)); localStorage.setItem('ROT_TASKS_v54', JSON.stringify(tasks)); localStorage.setItem('ROT_SOUND_v54', globalTone); renderLists(); syncFrames(); }
+
+        function syncFrames() {
+            sites.forEach(s => {
+                let p = document.getElementById(`p-${s.id}`);
+                if (!p) {
+                    const isImg = s.url.match(/\.(jpeg|jpg|gif|png|webp)$/i);
+                    const el = document.createElement(isImg ? 'div' : 'iframe');
+                    el.id = `p-${s.id}`; el.className = 'site-panel' + (isImg ? ' img-panel' : '');
+                    if (isImg) el.style.backgroundImage = `url(${s.url})`; else el.src = s.url;
+                    document.getElementById('content-area').appendChild(el);
+                }
+            });
+            Array.from(document.getElementById('content-area').children).forEach(p => { if(!sites.find(s=>`p-${s.id}`===p.id)) p.remove(); });
+        }
+
+        function loadSite(idx, force = false) {
+            if (sites.filter(s => s.visible).length === 0) return;
+            currentIndex = idx % sites.length;
+            if (!sites[currentIndex].visible) { loadSite(currentIndex + 1); return; }
+            const target = sites[currentIndex]; let p = document.getElementById(`p-${target.id}`);
+            let shouldHard = force || target.pendingScheduledSync;
+            if (!shouldHard && target.refresh > 0) {
+                const currentSlot = Math.floor(Date.now() / (target.refresh * 60000));
+                if (currentSlot > target.lastSyncSlot && target.lastSyncSlot !== -1) shouldHard = true;
+                target.lastSyncSlot = currentSlot;
+            }
+            if (shouldHard && p) {
+                target.pendingScheduledSync = false;
+                const freshUrl = target.url + (target.url.includes('?')?'&':'?') + "cb=" + Date.now();
+                const n = document.createElement(p.tagName); n.id=p.id; n.className=p.className;
+                if(n.tagName==='DIV') n.style.backgroundImage=`url('${freshUrl}')`; else n.src=freshUrl;
+                p.replaceWith(n); p = n; document.getElementById('current-label').innerText = "🔄 " + target.name;
+            } else { document.getElementById('current-label').innerText = target.name; }
             timeLeft = target.duration * 1000;
-
-            let shouldHardRefresh = manualForce;
-            if (target.pendingScheduledSync) { shouldHardRefresh = true; sites[index].pendingScheduledSync = false; }
-            if (!shouldHardRefresh && target.refresh > 0) {
-                const now = Date.now();
-                const currentSlot = Math.floor(now / (target.refresh * 60000));
-                if (currentSlot > target.lastSyncSlot) { shouldHardRefresh = true; sites[index].lastSyncSlot = currentSlot; }
-            }
-
-            let panel = document.getElementById(`panel-${target.id}`);
-            if (shouldHardRefresh && panel) {
-                let baseUrl = target.url; let fragment = "";
-                if (baseUrl.includes('#')) { const parts = baseUrl.split('#'); baseUrl = parts[0]; fragment = "#" + parts[1]; }
-                const finalUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}cb=${Date.now()}${fragment}`;
-                
-                const newPanel = document.createElement(panel.tagName === 'IFRAME' ? 'iframe' : 'div');
-                newPanel.className = panel.className;
-                newPanel.id = panel.id;
-                
-                if (panel.tagName === 'IFRAME') { newPanel.src = finalUrl; }
-                else { newPanel.style.backgroundImage = `url('${finalUrl}')`; }
-                
-                panel.replaceWith(newPanel);
-                panel = newPanel;
-                
-                sites[index].lastHardSyncTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                localStorage.setItem('ops_rotator_sites_final_v4', JSON.stringify(sites));
-            }
-            document.querySelectorAll('.site-panel').forEach(p => p.classList.remove('active'));
-            if(panel) panel.classList.add('active');
+            document.querySelectorAll('.site-panel').forEach(panel => panel.classList.remove('active'));
+            if (p) p.classList.add('active');
         }
 
-        function next() { if (sites.filter(s => s.visible).length === 0) return; let nextIdx = currentIndex; do { nextIdx = (nextIdx + 1) % sites.length; } while (!sites[nextIdx].visible); loadSite(nextIdx); }
-        function prev() { if (sites.filter(s => s.visible).length === 0) return; let prevIdx = currentIndex; do { prevIdx = (prevIdx - 1 + sites.length) % sites.length; } while (!sites[prevIdx].visible); loadSite(prevIdx); }
-        function refreshCurrent(hard = false) { loadSite(currentIndex, hard); }
+        function next() { loadSite(currentIndex + 1); }
+        function prev() { loadSite(currentIndex - 1 < 0 ? sites.length - 1 : currentIndex - 1); }
         function togglePause() { isPaused = !isPaused; document.getElementById('pause-btn').innerText = isPaused ? "RESUME" : "PAUSE"; }
-        function toggleManager() { const m = document.getElementById('manager'); const o = document.getElementById('overlay'); const show = m.style.display !== 'block'; m.style.display = show ? 'block' : 'none'; o.style.display = show ? 'block' : 'none'; if(show) renderList(); }
-
-        // --- HARDENED SCHEDULER ---
-        function checkScheduledRefreshes() {
-            const now = new Date();
-            // Force 24-hour cycle comparison to avoid local AM/PM formatting conflicts
-            const timeStr = now.toLocaleTimeString('en-US', { hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
-            const currentMinute = now.getMinutes();
-
-            if (currentMinute === lastScheduledRefreshMinute) return;
-
-            const triggerFHORefresh = () => {
-                const fhoIdx = sites.findIndex(s => s.locked === true);
-                if (fhoIdx !== -1) {
-                    if (currentIndex === fhoIdx) {
-                        console.log("FHO On-Screen: Executing scheduled Hard Refresh");
-                        loadSite(fhoIdx, true); 
-                    } else {
-                        console.log("FHO Off-Screen: Setting Sync Tripwire");
-                        sites[fhoIdx].pendingScheduledSync = true; 
-                        save(); 
+        function hardRefreshCurrent() { loadSite(currentIndex, true); }
+        function checkOperationalTasks() {
+            const now = new Date(); const h = now.getHours(), m = now.getMinutes();
+            const timeStr = h.toString().padStart(2,'0') + ":" + m.toString().padStart(2,'0');
+            const mmdd = (now.getMonth()+1).toString().padStart(2,'0') + "-" + now.getDate().toString().padStart(2,'0');
+            const syncKey = h + ":" + m;
+            if (m === 10 && syncKey !== lastSyncKey && (h === 7 || h === 14 || h === 15)) {
+                sites.forEach(s => { if (s.locked || s.name.includes("Flood")) s.pendingScheduledSync = true; });
+                lastSyncKey = syncKey;
+            }
+            if (timeStr !== lastTriggerMin) {
+                const isWD = (now.getDay() >= 1 && now.getDay() <= 5);
+                const currentTZ = (now.getTimezoneOffset() / 60 === 5) ? "CDT" : "CST";
+                tasks.forEach(t => {
+                    if (t.time === timeStr) {
+                        if (t.tzAware && t.tzAware !== currentTZ) return;
+                        if (t.type === 'daily' || (t.type === 'weekday' && isWD) || (t.type === 'seasonal' && mmdd >= t.start && mmdd <= t.end)) {
+                            document.getElementById('task-alert-text').innerText = t.desc;
+                            document.getElementById('task-alert-overlay').style.display = 'flex';
+                            playSelectedTone(); lastTriggerMin = timeStr;
+                            setTimeout(() => { document.getElementById('task-alert-overlay').style.display = 'none'; }, 10000);
+                        }
                     }
-                }
-                lastScheduledRefreshMinute = currentMinute;
-            };
-
-            // STRICT OPERATIONAL TRIGGERS
-            if (timeStr === "07:10" || timeStr === "15:10" || timeStr === "14:10") triggerFHORefresh();
-
+                });
+            }
             const fho = sites.find(s => s.locked);
-            const syncLabel = (fho && fho.pendingScheduledSync) ? "!! PENDING SYNC !!" : "Active";
-            document.getElementById('debug-clock').innerText = `Clock: ${timeStr} | FHO Sync: ${syncLabel}`;
+            document.getElementById('debug-clock').innerText = `Clock: ${timeStr} | Sync: ${(fho && fho.pendingScheduledSync) ? "QUEUED" : "Active"}`;
         }
 
-        setInterval(() => { if (!isPaused && currentIndex !== -1) { timeLeft -= 100; let total = sites[currentIndex].duration * 1000; progressBar.style.width = Math.min(((total - timeLeft) / total) * 100, 100) + "%"; if (timeLeft <= 0) next(); } checkScheduledRefreshes(); }, 100);
-        syncDisplays(); renderList(); loadSite(sites.findIndex(s => s.visible));
+        function handleUrlInput(v) { 
+            const n = document.getElementById('new-name'); if(n.value) return;
+            if(v.includes("National_FHO")) n.value="Flood Hazard Outlook";
+            else if(v.includes("owp-time-zone")) n.value="OWP TimeZone";
+            else if(v.includes("radar.weather.gov")) n.value= v.includes("WzE1Ny") ? "RADAR Alaska" : "RADAR CONUS/Hawaii";
+            else if(v.includes("water.noaa.gov")) n.value="NWPS";
+        }
+        function switchTab(id, btn) { document.querySelectorAll('.tab-content, .tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(`tab-${id}`).classList.add('active'); btn.classList.add('active'); }
+        function toggleManager() { const m = document.getElementById('manager'), o = document.getElementById('modal-overlay'); const v = m.style.display === 'block'; m.style.display = v ? 'none' : 'block'; o.style.display = v ? 'none' : 'block'; if (!v) { document.getElementById('global-sound-select').value = globalTone; renderLists(); } }
+        function toggleTaskDates() { document.getElementById('task-date-inputs').style.display = document.getElementById('task-type').value==='seasonal'?'flex':'none'; }
+        function updateGlobalSound(v) { globalTone = v; save(); }
+
+        function renderLists() {
+            const sl = document.getElementById('site-list'); sl.innerHTML = '';
+            sites.forEach((s, i) => {
+                sl.innerHTML += `<tr><td><input type="checkbox" ${s.visible?'checked':''} onchange="sites[${i}].visible=this.checked;save()"></td>
+                    <td>${s.name}</td><td>${s.url.substring(0,25)}...</td>
+                    <td><input type="number" class="input-inline" value="${s.duration}" onchange="sites[${i}].duration=parseInt(this.value);save()"></td>
+                    <td><input type="number" class="input-inline" value="${s.refresh || 0}" onchange="sites[${i}].refresh=parseInt(this.value);sites[${i}].lastSyncSlot=-1;save()"></td>
+                    <td>${s.locked?'🔒':`<button onclick="sites.splice(${i},1);save()">DEL</button>`}</td></tr>`;
+            });
+            const tl = document.getElementById('task-list'); tl.innerHTML = '';
+            tasks.forEach((t, i) => { tl.innerHTML += `<tr><td>${t.time}${t.tzAware?' ('+t.tzAware+')':''}</td><td>${t.desc}</td><td>${t.type}</td><td>${t.type==='seasonal'?t.start+' to '+t.end:'N/A'}</td><td><button onclick="tasks.splice(${i},1);save()">DEL</button></td></tr>`; });
+        }
+
+        function addSite() { const n = document.getElementById('new-name').value, u = document.getElementById('new-url').value, d = document.getElementById('new-duration').value, r = document.getElementById('new-refresh').value; if(!u) return; sites.push({ id: Date.now(), name: n || "New Site", url: u, duration: parseInt(d), refresh: parseInt(r), lastSyncSlot: -1, visible: true }); save(); }
+        function addTask() { const t = document.getElementById('task-time').value, d = document.getElementById('task-desc').value, tp = document.getElementById('task-type').value; if(!d) return; tasks.push({ id: Date.now(), time: t, desc: d, type: tp, start: document.getElementById('task-start').value, end: document.getElementById('task-end').value }); save(); }
+
+        setInterval(() => { if (!isPaused && currentIndex !== -1) { timeLeft -= 100; const total = sites[currentIndex].duration * 1000; document.getElementById('progress-bar').style.width = Math.max(0, ((total - timeLeft) / total) * 100) + "%"; if (timeLeft <= 0) next(); } checkOperationalTasks(); }, 100);
+        syncFrames(); renderLists(); setTimeout(() => { if (currentIndex === -1) loadSite(0); }, 1000);
     </script>
 </body>
 </html>
