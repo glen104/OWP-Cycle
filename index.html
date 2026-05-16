@@ -435,6 +435,7 @@
                         triggerCWDAlert(data);
                     }
                     lastCWDSignature = sig;
+                    cwdData = data; // store for test button
                     
                     // Update the CWD panel in settings modal
                     renderCWDPanel(data);
@@ -475,8 +476,26 @@
             triggerCWDAlert(cwdData);
         }
 
+        // Fetch immediately on load, then schedule to run at :02 and :32 past each hour
         fetchCWDStatus();
-        setInterval(fetchCWDStatus, 1800000); // 30 minutes
+
+        function scheduleCWDFetch() {
+            var now = new Date();
+            var minutes = now.getMinutes();
+            var seconds = now.getSeconds();
+            // Find next :02 or :32
+            var nextTarget;
+            if(minutes < 2) nextTarget = 2;
+            else if(minutes < 32) nextTarget = 32;
+            else nextTarget = 62; // wraps to :02 next hour
+            var msUntilNext = ((nextTarget - minutes) * 60 - seconds) * 1000;
+            setTimeout(function() {
+                fetchCWDStatus();
+                // After first hit, run every 30 min
+                setInterval(fetchCWDStatus, 1800000);
+            }, msUntilNext);
+        }
+        scheduleCWDFetch();
 
         syncFrames(); renderLists(); setTimeout(function(){ if(currentIndex===-1) loadSite(0); }, 3000);
     </script>
