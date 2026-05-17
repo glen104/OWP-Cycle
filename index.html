@@ -270,6 +270,7 @@
             (data.days || []).forEach(function(d) {
                 var s = shortStatus(d.status);
                 var icons = hazardIcons(d.hazards);
+                console.log('Day:', d.date, 'Hazards:', JSON.stringify(d.hazards), 'Icons:', icons);
                 var dayNum = parseInt((d.date || '').split(' ').pop());
                 var label = d.weekday + ' ' + d.date;
                 if(dayNum === todayDate) label = 'TODAY';
@@ -458,6 +459,7 @@
             (data.days || []).forEach(function(d) {
                 var color = d.status === 'Normal' ? '#00c853' : d.status.includes('Critical') ? '#da3633' : '#FF9800';
                 var icons = hazardIcons(d.hazards);
+                console.log('Day:', d.date, 'Hazards:', JSON.stringify(d.hazards), 'Icons:', icons);
                 var dayNum = parseInt((d.date || '').split(' ').pop());
                 var dayLabel = d.weekday + ' ' + d.date;
                 if(dayNum === todayDate) dayLabel = 'TODAY · ' + d.date;
