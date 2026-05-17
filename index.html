@@ -397,13 +397,7 @@
         function hazardIcons(hazards) {
             if(!hazards || !hazards.length) return '';
             return hazards.map(function(h) {
-                var u = h.toUpperCase();
-                if(u.includes('SEVERE') || u.includes('THUNDER') || u.includes('LIGHTNING')) return '⚡';
-                if(u.includes('FIRE') || u.includes('WILDFIRE')) return '🔥';
-                if(u.includes('FLOOD') || u.includes('RAIN')) return '🌧';
-                if(u.includes('WINTER') || u.includes('SNOW') || u.includes('ICE')) return '❄';
-                if(u.includes('TROPICAL') || u.includes('HURRICANE')) return '🌀';
-                return '⚠';
+                return '<img src="https://www.nco.ncep.noaa.gov/status/css/images/icon-' + h + '.png" style="width:28px; height:28px; vertical-align:middle;" alt="' + h + '">';
             }).join(' ');
         }
 
@@ -431,9 +425,22 @@
                         (todayDay ? todayDay.status + todayDay.hazards.join(',') : '') + '|' +
                         (tomorrowDay ? tomorrowDay.status + tomorrowDay.hazards.join(',') : '');
 
-                    // If something changed, fire the alert
-                    if(lastCWDSignature !== null && sig !== lastCWDSignature) {
-                        triggerCWDAlert(data);
+                    // Only alert if:
+                    // 1. We have a previous signature to compare against
+                    // 2. The signature actually changed
+                    // 3. The new data has valid days (not an error/empty response)
+                    // 4. The change is meaningful (status or hazards, not just timestamp)
+                    var hasValidDays = data.days && data.days.length > 0;
+                    var hasNonNormalDay = (data.days || []).some(function(d) { return d.status !== 'Normal'; });
+                    
+                    if(lastCWDSignature !== null && sig !== lastCWDSignature && hasValidDays) {
+                        // Only alert if there's actually something worth alerting about
+                        // (a non-normal day exists, or status itself changed to non-normal)
+                        var prevStatus = lastCWDSignature.split('|')[0];
+                        var statusChanged = prevStatus !== data.status;
+                        if(statusChanged || hasNonNormalDay) {
+                            triggerCWDAlert(data);
+                        }
                     }
                     lastCWDSignature = sig;
                     cwdData = data; // store for test button
