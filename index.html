@@ -747,7 +747,7 @@
                             }
                         }, delay);
                     })(s, iframeDelay);
-                    iframeDelay += 250;
+                    iframeDelay += 100;
                 }
             });
         }
@@ -1206,8 +1206,8 @@
         setTimeout(function(){
             syncFrames();
             renderLists();
-            setTimeout(function(){ loadSite(0); }, 3000);
-        }, 1500); // small delay so AHD fetch can complete first
+            setTimeout(function(){ loadSite(0); }, 1000);
+        }, 500); // small delay so AHD fetch can complete first
     </script>
 </body>
 </html>
