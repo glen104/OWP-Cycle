@@ -47,7 +47,7 @@
 
         /* HUD BAR */
         #hud { 
-            background: rgba(13, 17, 23, 0.15); border: 2px solid rgba(0, 229, 255, 0.25);
+            background: rgba(13, 17, 23, 0.08); border: 2px solid rgba(0, 229, 255, 0.08);
             backdrop-filter: none; padding: 12px 30px; border-radius: 40px; 
             display: flex; gap: 12px; align-items: center; transition: all 0.2s ease-in-out;
         }
@@ -64,12 +64,12 @@
         
         /* RESCUE TAB */
         #restore-tab { 
-            position: fixed; bottom: 20px; left: 25px;
-            background: rgba(13, 17, 23, 0.6); border: 2px solid var(--z-cyan); 
+            position: fixed; bottom: 150px; left: 25px;
+            background: rgba(13, 17, 23, 0.35); border: 2px solid rgba(0, 229, 255, 0.5); 
             border-radius: 12px; padding: 8px 20px; 
-            font-size: 0.8rem; font-weight: 900; color: var(--z-cyan); 
+            font-size: 0.8rem; font-weight: 900; color: rgba(0, 229, 255, 0.6); 
             cursor: pointer; display: none; white-space: nowrap; letter-spacing: 1px;
-            z-index: 1000020; box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+            z-index: 1000020; box-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
             transition: all 0.2s ease;
         }
         #restore-tab:hover { background: var(--z-cyan); color: #000; box-shadow: 0 0 25px var(--z-cyan); }
@@ -681,8 +681,8 @@
             var p = document.getElementById("p-"+target.id);
             var isImg = target.forceImage || target.url.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/i) || target.id === 100;
 
-            var intervalElapsed = target.refresh > 0 && (Math.floor(Date.now() / (target.refresh * 60000)) > target.lastSyncSlot);
-            var shouldReload = force || target.pendingScheduledSync || intervalElapsed || target.refreshOnView;
+            var isFirstLoad = (target.lastSyncSlot === -1);
+            var shouldReload = force || target.pendingScheduledSync || isFirstLoad;
 
             if(shouldReload && p) {
                 target.pendingScheduledSync = false;
@@ -1157,7 +1157,28 @@
         }
 
         // ── TIMERS ────────────────────────────────────────────────────────────
-        // Progress bar — 100ms for smooth animation
+        // Background refresh — reloads non-active iframes while hidden so no blank on view
+        setInterval(function() {
+            var now = Date.now();
+            sites.forEach(function(s, i) {
+                if (i === currentIndex) return; // never touch active panel
+                if (!s.refresh || s.refresh <= 0) return; // no interval set
+                if (s.isAHD || s.isCWDPanel || s.locked || s.forceImage) return;
+                if (s.url && s.url.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/i)) return; // images only on schedule
+                var slot = Math.floor(now / (s.refresh * 60000));
+                if (slot > s.lastSyncSlot) {
+                    var p = document.getElementById('p-' + s.id);
+                    if (p && p.tagName === 'IFRAME') {
+                        var baseUrl = s.url.indexOf('#') !== -1 ? s.url.split('#')[0] : s.url;
+                        var hashPart = s.url.indexOf('#') !== -1 ? '#' + s.url.split('#')[1] : '';
+                        var sep = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+                        p.src = baseUrl + sep + '_r=' + now + hashPart;
+                        s.lastSyncSlot = slot;
+                        console.log('[BG refresh]', s.name);
+                    }
+                }
+            });
+        }, 60000); // check every minute
         setInterval(function() {
             if(!isPaused && currentIndex !== -1) {
                 timeLeft -= 100;
