@@ -144,6 +144,7 @@
         <div id="alert-top-label" style="font-size:1rem; letter-spacing:5px; font-weight:900; color:rgba(255,255,255,0.8); text-transform:uppercase; margin-bottom:8px;">OPERATIONAL NOTIFICATION</div>
         <h2 id="task-alert-text" style="font-size:3.8rem; font-weight:900; text-transform:uppercase; text-shadow:0 0 40px black; text-align:center; color:white; padding:0 20px; margin:0;">ALERT</h2>
         <div id="alert-cwd-rows" style="display:none; flex-direction:column; align-items:center; gap:6px; margin-top:10px;"></div>
+        <div id="alert-queue-count" style="display:none; position:absolute; bottom:10px; right:16px; font-size:0.7rem; font-weight:900; color:rgba(255,255,255,0.6); letter-spacing:2px;"></div>
     </div>
 
     <div id="content-area"></div>
@@ -183,6 +184,7 @@
             <button class="btn" onclick="prev()">PREV</button>
             <button class="btn" onclick="togglePause()" id="pause-btn">PAUSE</button>
             <button class="btn" onclick="next()">NEXT</button>
+            <button class="btn" id="km-force-expire-hud" onclick="forceExpireKM()" style="color:var(--danger); border-color:var(--danger); display:none;">⚡ EXPIRE KM</button>
             <button class="btn" onclick="openFrame()" style="color: #8b949e; border-color: #8b949e;">OPEN FRAME</button>
             <button class="btn" onclick="quickUpdateLink()" style="color: var(--warning); border-color: var(--warning);">PAGE UPDATE</button>
             <button class="btn" onclick="hardRefreshCurrent()" style="color: var(--z-cyan); border-color: var(--z-cyan);">HARD REFRESH</button>
@@ -217,6 +219,11 @@
                 <th style="width:50px;" title="Force treat as image">Img</th>
                 <th>Action</th>
             </tr></thead><tbody id="site-list"></tbody></table>
+            <div style="background:rgba(255,255,255,0.03); padding:14px 20px; border-radius:12px; display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+                <span style="font-size:0.75rem; font-weight:900; color:#8b949e; letter-spacing:2px; text-transform:uppercase;">Product Cycling:</span>
+                <button class="btn" id="ahd-toggle-btn" onclick="toggleAHDEnabled()" style="font-size:0.75rem; padding:7px 16px;">✓ AHD ON</button>
+                <button class="btn" id="km-toggle-btn" onclick="toggleKMEnabled()" style="font-size:0.75rem; padding:7px 16px;">✓ KEY MSG ON</button>
+            </div>
             <div style="background:rgba(255,255,255,0.03); padding:20px; border-radius:12px; display:flex; gap:10px;">
                 <input type="text" id="new-name" placeholder="Name" style="flex:1;">
                 <input type="text" id="new-url" placeholder="URL" style="flex:2;">
@@ -365,6 +372,11 @@
         var STORAGE_KEY = 'ROT_OPS_MASTER';
         var AHD_JSON_URL = 'https://www.weather.gov/source/owp/AHD/wpod_products.json';
         var AHD_ARCHIVE_BASE = 'https://www.weather.gov/images/owp/AHD/Archive/';
+        var KM_JSON_URL  = 'https://www.weather.gov/source/owp/KM/wpod_products.json';
+        var KM_IMG_URL   = 'https://www.weather.gov/images/owp/KM/KM.png';
+        var KM_ARCHIVE_BASE = 'https://www.weather.gov/images/owp/KM/Archive/';
+        var ahdEnabled = (localStorage.getItem(STORAGE_KEY+'_AHD_ENABLED') !== 'false');
+        var kmEnabled  = (localStorage.getItem(STORAGE_KEY+'_KM_ENABLED')  !== 'false');
 
         var defaultSites = [
             {id:100,name:"Flood Hazard Outlook",url:"https://www.weather.gov/images/owp/FHO/National/National_FHO.png",duration:10,refresh:0,lastSyncSlot:-1,visible:true,locked:true,pendingScheduledSync:false,refreshOnView:false,showLabel:false},
@@ -480,6 +492,7 @@
 
         // ── AHD SYNC ──────────────────────────────────────────────────────────
         function syncAHDPanels() {
+            if (!ahdEnabled) { removeProductPanels('isAHD'); return; }
             fetch(AHD_JSON_URL + '?cb=' + Date.now())
                 .then(function(r){ return r.json(); })
                 .then(function(data) {
@@ -568,6 +581,204 @@
             setInterval(syncAHDPanels, 300000); // 5 min
         }
 
+        // ── PRODUCT PANEL HELPERS ─────────────────────────────────────────────
+        function removeProductPanels(flag) {
+            var currentSiteId = (currentIndex >= 0 && currentIndex < sites.length) ? sites[currentIndex].id : null;
+            var removed = sites.filter(function(s){ return s[flag]; });
+            removed.forEach(function(s) {
+                var el = document.getElementById('p-' + s.id);
+                if (el) el.remove();
+            });
+            sites = sites.filter(function(s){ return !s[flag]; });
+            if (currentSiteId !== null) {
+                var newIdx = sites.findIndex(function(s){ return s.id === currentSiteId; });
+                if (newIdx !== -1) currentIndex = newIdx;
+                else if (currentIndex >= sites.length) currentIndex = 0;
+            }
+            renderLists();
+        }
+
+        // ── KM SYNC ───────────────────────────────────────────────────────────
+        function syncKMPanel() {
+            if (!kmEnabled) { removeProductPanels('isKM'); return; }
+
+            fetch(KM_JSON_URL + '?cb=' + Date.now())
+                .then(function(r){ return r.ok ? r.json() : Promise.reject('no-json'); })
+                .then(function(data) {
+                    console.log('[KM] JSON found:', JSON.stringify(data).substring(0,200));
+                    var km = data.km || data;
+                    var latestDate = km['latest-date'] || null;
+                    var archiveList = km.archive || [];
+                    var expirations = (km.meta && km.meta.expirations) || {};
+
+                    if (Object.keys(expirations).length > 0) {
+                        buildKMPanels(expirations, KM_ARCHIVE_BASE);
+                    } else if (latestDate) {
+                        var issuanceMs = new Date(latestDate).getTime();
+                        var expiryMs = issuanceMs + 86400000;
+                        if (Date.now() < expiryMs) {
+                            var filename = archiveList.length ? archiveList[archiveList.length-1] : null;
+                            var imgUrl = filename ? KM_ARCHIVE_BASE + filename : KM_IMG_URL + '?cb=' + Date.now();
+                            var safeId = 'km_' + latestDate.replace(/[:.]/g, '-');
+                            injectKMSite(safeId, imgUrl, latestDate, expiryMs);
+                        } else {
+                            removeProductPanels('isKM');
+                        }
+                    } else {
+                        console.log('[KM] JSON has no usable data — falling back');
+                        syncKMFallback();
+                    }
+                })
+                .catch(function(e) {
+                    console.log('[KM] No JSON (' + e + ') — trying image fallback');
+                    syncKMFallback();
+                });
+        }
+
+        function syncKMFallback() {
+            var forcedExpiry = parseInt(localStorage.getItem(STORAGE_KEY + '_KM_FORCED') || '0');
+            if (forcedExpiry && Date.now() > forcedExpiry) {
+                console.log('[KM] Forced expired');
+                removeProductPanels('isKM');
+                return;
+            }
+            console.log('[KM] Trying fetch for KM.png...');
+            fetch(KM_IMG_URL + '?cb=' + Date.now())
+                .then(function(r) {
+                    console.log('[KM] fetch ok:', r.ok, 'status:', r.status);
+                    if (!r.ok) { removeProductPanels('isKM'); localStorage.removeItem(STORAGE_KEY+'_KM_ISSUED'); return; }
+                    var lastMod = r.headers.get('Last-Modified') || r.headers.get('last-modified');
+                    console.log('[KM] Last-Modified:', lastMod);
+                    if (lastMod) {
+                        var issuanceMs = new Date(lastMod).getTime();
+                        var stored = localStorage.getItem(STORAGE_KEY+'_KM_LASTMOD');
+                        if (lastMod !== stored) {
+                            localStorage.setItem(STORAGE_KEY+'_KM_LASTMOD', lastMod);
+                            localStorage.setItem(STORAGE_KEY+'_KM_ISSUED', issuanceMs);
+                            localStorage.removeItem(STORAGE_KEY+'_KM_FORCED');
+                        }
+                    }
+                    injectKMFromStorage();
+                })
+                .catch(function(e) {
+                    console.log('[KM] fetch blocked (' + e + ') — trying Image()');
+                    var img = new Image();
+                    img.onload = function() { console.log('[KM] Image() loaded OK'); injectKMFromStorage(); };
+                    img.onerror = function() { console.log('[KM] Image() failed — KM.png not found'); removeProductPanels('isKM'); localStorage.removeItem(STORAGE_KEY+'_KM_ISSUED'); };
+                    img.src = KM_IMG_URL + '?cb=' + Date.now();
+                });
+        }
+
+        function injectKMFromStorage() {
+            var storedIssuance = parseInt(localStorage.getItem(STORAGE_KEY+'_KM_ISSUED') || '0');
+            console.log('[KM] injectKMFromStorage — storedIssuance:', storedIssuance);
+            if (!storedIssuance) {
+                storedIssuance = Date.now();
+                localStorage.setItem(STORAGE_KEY+'_KM_ISSUED', storedIssuance);
+            }
+            var expiryMs = storedIssuance + 86400000;
+            if (Date.now() > expiryMs) {
+                console.log('[KM] expired by 24hr rule');
+                removeProductPanels('isKM');
+                localStorage.removeItem(STORAGE_KEY+'_KM_ISSUED');
+                return;
+            }
+            var issuedAt = new Date(storedIssuance).toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' +
+                           new Date(storedIssuance).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+            console.log('[KM] injecting panel, issued:', issuedAt, 'expires:', new Date(expiryMs).toISOString());
+            injectKMSite('km_current', KM_IMG_URL + '?cb=' + Date.now(), issuedAt, expiryMs);
+        }
+
+        function buildKMPanels(expirations, archiveBase) {
+            var now = Date.now();
+            var validKMs = [];
+            Object.keys(expirations).forEach(function(filename) {
+                var expTime = new Date(expirations[filename]).getTime();
+                if (expTime > now) validKMs.push({ filename: filename, expTime: expTime, expiresAt: expirations[filename] });
+            });
+            validKMs.sort(function(a,b){ return a.filename.localeCompare(b.filename); });
+            removeProductPanels('isKM');
+            validKMs.forEach(function(km) {
+                var rawTs = km.filename.replace('KM_','').replace('.png','');
+                var dtObj = new Date(rawTs);
+                var issuedLabel = isNaN(dtObj.getTime()) ? rawTs :
+                    dtObj.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' +
+                    dtObj.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+                injectKMSite('km_' + rawTs.replace(/[:.]/g,'-'), archiveBase + km.filename, issuedLabel, new Date(km.expiresAt).getTime());
+            });
+            syncFrames(); renderLists();
+        }
+
+        function injectKMSite(safeId, imgUrl, issuedAt, expiryMs) {
+            var currentSiteId = (currentIndex >= 0 && currentIndex < sites.length) ? sites[currentIndex].id : null;
+            // Remove stale KM with same id
+            sites = sites.filter(function(s){ return s.id !== safeId; });
+            var el = document.getElementById('p-' + safeId);
+            if (el) el.remove();
+
+            // Insert after AHDs (which are after FHO)
+            var insertAfter = sites.reduce(function(last, s, i){
+                return (s.id === 100 || s.isAHD) ? i : last;
+            }, 0);
+
+            sites.splice(insertAfter + 1, 0, {
+                id: safeId, name: 'Key Messages',
+                url: imgUrl, duration: 15, refresh: 0,
+                lastSyncSlot: -1, visible: true,
+                isKM: true, locked: true, showLabel: false,
+                expiresAt: new Date(expiryMs).toISOString(),
+                issuedAt: issuedAt
+            });
+
+            syncFrames();
+            if (currentSiteId !== null) {
+                var newIdx = sites.findIndex(function(s){ return s.id === currentSiteId; });
+                if (newIdx !== -1) currentIndex = newIdx;
+            }
+            renderLists();
+        }
+
+        function forceExpireKM() {
+            if (!confirm('Force expire the current Key Messages panel?')) return;
+            localStorage.setItem(STORAGE_KEY + '_KM_FORCED', Date.now().toString());
+            removeProductPanels('isKM');
+        }
+
+        function scheduleKMSync() {
+            setInterval(syncKMPanel, 300000); // 5 min — same as AHD
+        }
+
+        function toggleAHDEnabled() {
+            ahdEnabled = !ahdEnabled;
+            localStorage.setItem(STORAGE_KEY + '_AHD_ENABLED', ahdEnabled);
+            updateProductToggles();
+            if (ahdEnabled) syncAHDPanels();
+            else removeProductPanels('isAHD');
+        }
+
+        function toggleKMEnabled() {
+            kmEnabled = !kmEnabled;
+            localStorage.setItem(STORAGE_KEY + '_KM_ENABLED', kmEnabled);
+            updateProductToggles();
+            if (kmEnabled) syncKMPanel();
+            else removeProductPanels('isKM');
+        }
+
+        function updateProductToggles() {
+            var ahdBtn = document.getElementById('ahd-toggle-btn');
+            var kmBtn  = document.getElementById('km-toggle-btn');
+            if (ahdBtn) {
+                ahdBtn.innerText  = ahdEnabled ? '✓ AHD CYCLING ON'  : '✗ AHD CYCLING OFF';
+                ahdBtn.style.color = ahdEnabled ? 'var(--success)' : 'var(--danger)';
+                ahdBtn.style.borderColor = ahdEnabled ? 'var(--success)' : 'var(--danger)';
+            }
+            if (kmBtn) {
+                kmBtn.innerText  = kmEnabled ? '✓ KEY MSG CYCLING ON'  : '✗ KEY MSG CYCLING OFF';
+                kmBtn.style.color = kmEnabled ? 'var(--success)' : 'var(--danger)';
+                kmBtn.style.borderColor = kmEnabled ? 'var(--success)' : 'var(--danger)';
+            }
+        }
+
         // ── DST DETECTION ─────────────────────────────────────────────────────
         function isDST() {
             var jan = new Date(new Date().getFullYear(), 0, 1).getTimezoneOffset();
@@ -636,11 +847,29 @@
                 }
             }
 
-            // Real-time AHD expiry — AHDs always expire on the hour, catch it the second it happens
+            // AHD expiry warnings — fire once when 45 min remaining
+            var nowMs = Date.now();
+            var activeAHDs = sites.filter(function(s){ return s.isAHD && s.expiresAt; })
+                .sort(function(a,b){ return (a.filename||'').localeCompare(b.filename||''); });
+            activeAHDs.forEach(function(s, idx) {
+                var expMs = new Date(s.expiresAt).getTime();
+                var remaining = expMs - nowMs;
+                var warnKey = 'ahd_expwarn_' + (s.filename || s.id);
+                if (remaining <= 2700000 && remaining > 0 && !firedTasks[warnKey]) {
+                    var ahdNum = idx + 1;
+                    queueAlert(2, function() {
+                        document.getElementById('task-alert-text').innerText = 'AHD #' + ahdNum + ' EXPIRES IN 45 MINUTES';
+                        document.getElementById('alert-top-label').innerText = 'AHD EXPIRY NOTICE';
+                        document.getElementById('alert-cwd-rows').style.display = 'none';
+                        document.getElementById('alert-cwd-rows').innerHTML = '';
+                    }, 15000);
+                    firedTasks[warnKey] = true;
+                }
+            });
             var nowMs = Date.now();
             var expiredAny = false;
             sites = sites.filter(function(site) {
-                if (site.isAHD && site.expiresAt && nowMs > new Date(site.expiresAt).getTime()) {
+                if ((site.isAHD || site.isKM) && site.expiresAt && nowMs > new Date(site.expiresAt).getTime()) {
                     var el = document.getElementById('p-' + site.id);
                     if (el) el.remove();
                     expiredAny = true;
@@ -655,43 +884,107 @@
         }
 
         // ── ALERTS ────────────────────────────────────────────────────────────
-        function triggerAlert(msg) {
-            document.getElementById('task-alert-text').innerText = msg;
-            document.getElementById('alert-top-label').innerText = 'OPERATIONAL NOTIFICATION';
-            document.getElementById('alert-cwd-rows').style.display = 'none';
-            document.getElementById('alert-cwd-rows').innerHTML = '';
-            document.getElementById('task-alert-overlay').style.display = 'flex';
+        // ── ALERT QUEUE ───────────────────────────────────────────────────────
+        // Priority: 1=Scheduler (highest), 2=AHD expiry, 3=CWD, 0=Warnings (future slot)
+        var alertQueue = [];
+        var alertActive = false;
+        var alertDismissTimer = null;
+
+        function queueAlert(priority, renderFn, durationMs) {
+            // Higher priority number = lower importance. Priority 0 reserved for warnings.
+            // Insert in priority order (lowest number first)
+            var item = { priority: priority, renderFn: renderFn, durationMs: durationMs || 15000 };
+            var inserted = false;
+            for (var i = 0; i < alertQueue.length; i++) {
+                if (priority < alertQueue[i].priority) {
+                    alertQueue.splice(i, 0, item);
+                    inserted = true;
+                    break;
+                }
+            }
+            if (!inserted) alertQueue.push(item);
+
+            // If a lower-priority alert is currently showing, interrupt it
+            if (alertActive) {
+                var currentPriority = alertQueue[0] ? alertQueue[0].priority : 99;
+                if (priority < currentPriority) {
+                    clearTimeout(alertDismissTimer);
+                    alertDismissTimer = null;
+                    alertActive = false;
+                    // Re-insert the interrupted item back at front if it was lower priority
+                }
+            }
+
+            if (!alertActive) showNextAlert();
+            else updateQueueIndicator();
+        }
+
+        function showNextAlert() {
+            if (alertQueue.length === 0) {
+                alertActive = false;
+                updateQueueIndicator();
+                return;
+            }
+            alertActive = true;
+            var item = alertQueue.shift();
+            item.renderFn();
             playSelectedTone();
-            setTimeout(()=>{ document.getElementById('task-alert-overlay').style.display='none'; }, 15000);
+            document.getElementById('task-alert-overlay').style.display = 'flex';
+            updateQueueIndicator();
+            alertDismissTimer = setTimeout(function() {
+                document.getElementById('task-alert-overlay').style.display = 'none';
+                alertActive = false;
+                showNextAlert();
+            }, item.durationMs);
+        }
+
+        function updateQueueIndicator() {
+            var el = document.getElementById('alert-queue-count');
+            if (el) {
+                if (alertQueue.length > 0) {
+                    el.innerText = '+' + alertQueue.length + ' MORE';
+                    el.style.display = 'block';
+                } else {
+                    el.style.display = 'none';
+                }
+            }
+        }
+
+        function triggerAlert(msg) {
+            queueAlert(1, function() {
+                document.getElementById('task-alert-text').innerText = msg;
+                document.getElementById('alert-top-label').innerText = 'OPERATIONAL NOTIFICATION';
+                document.getElementById('alert-cwd-rows').style.display = 'none';
+                document.getElementById('alert-cwd-rows').innerHTML = '';
+            }, 15000);
         }
 
         function triggerCWDAlert(data) {
-            var today = new Date();
-            var todayDate = today.getDate();
-            var tomorrowDate = new Date(today.getTime() + 86400000).getDate();
-            document.getElementById('task-alert-text').innerText = 'NCO STATUS UPDATE';
-            document.getElementById('alert-top-label').innerText = '⚠ NCO CRITICAL WEATHER DAY ALERT';
-            var rowsEl = document.getElementById('alert-cwd-rows');
-            rowsEl.innerHTML = '';
-            (data.days || []).forEach(function(d) {
-                var s = shortStatus(d.status);
-                var icons = hazardIcons(d.hazards);
-                var dayNum = parseInt((d.date || '').split(' ').pop());
-                var label = d.weekday + ' ' + d.date;
-                if(dayNum === todayDate) label = 'TODAY';
-                else if(dayNum === tomorrowDate) label = 'TOMORROW';
-                var color = s === 'NORMAL' ? '#00e676' : s === 'CWD' ? '#ff3b3b' : '#ffca28';
-                var row = document.createElement('div');
-                row.style.cssText = 'display:flex; align-items:center; gap:14px; background:rgba(0,0,0,0.3); padding:6px 24px; border-radius:6px; min-width:300px; justify-content:space-between;';
-                row.innerHTML = '<span style="font-size:1.1rem; font-weight:900; color:rgba(255,255,255,0.8); letter-spacing:2px; min-width:100px;">' + label + '</span>' +
-                    '<span style="font-size:1.4rem; font-weight:900; color:' + color + '; letter-spacing:2px;">' + s + '</span>' +
-                    '<span style="font-size:1.4rem;">' + (icons || '—') + '</span>';
-                rowsEl.appendChild(row);
-            });
-            rowsEl.style.display = 'flex';
-            document.getElementById('task-alert-overlay').style.display = 'flex';
-            playSelectedTone();
-            setTimeout(()=>{ document.getElementById('task-alert-overlay').style.display='none'; }, 15000);
+            queueAlert(3, function() {
+                var today = new Date();
+                var todayDate = today.getDate();
+                var tomorrowDate = new Date(today.getTime() + 86400000).getDate();
+                document.getElementById('task-alert-text').innerText = 'NCO STATUS UPDATE';
+                document.getElementById('alert-top-label').innerText = '⚠ NCO CRITICAL WEATHER DAY ALERT';
+                var rowsEl = document.getElementById('alert-cwd-rows');
+                rowsEl.innerHTML = '';
+                (data.days || []).forEach(function(d) {
+                    var s = shortStatus(d.status);
+                    var icons = hazardIcons(d.hazards);
+                    var dayNum = parseInt((d.date || '').split(' ').pop());
+                    var label = d.weekday + ' ' + d.date;
+                    if(dayNum === todayDate) label = 'TODAY';
+                    else if(dayNum === tomorrowDate) label = 'TOMORROW';
+                    var color = s === 'NORMAL' ? '#00e676' : s === 'CWD' ? '#ff3b3b' : '#ffca28';
+                    var row = document.createElement('div');
+                    row.style.cssText = 'display:flex; align-items:center; gap:14px; background:rgba(0,0,0,0.3); padding:6px 24px; border-radius:6px; min-width:300px; justify-content:space-between;';
+                    row.innerHTML = '<span style="font-size:1.1rem; font-weight:900; color:rgba(255,255,255,0.8); letter-spacing:2px; min-width:100px;">' + label + '</span>' +
+                        '<span style="font-size:1.4rem; font-weight:900; color:' + color + '; letter-spacing:2px;">' + s + '</span>' +
+                        '<span style="font-size:1.4rem;">' + (icons || '—') + '</span>';
+                    rowsEl.appendChild(row);
+                });
+                rowsEl.style.display = 'flex';
+            }, 15000);
         }
 
         // ── SITE LOADING ──────────────────────────────────────────────────────
@@ -702,7 +995,7 @@
             var target = sites[currentIndex];
 
             // Belt-and-suspenders: if we somehow land on an expired AHD, skip it
-            if (target.isAHD && target.expiresAt && Date.now() > new Date(target.expiresAt).getTime()) {
+            if ((target.isAHD || target.isKM) && target.expiresAt && Date.now() > new Date(target.expiresAt).getTime()) {
                 sites.splice(currentIndex, 1);
                 var deadEl = document.getElementById('p-' + target.id);
                 if (deadEl) deadEl.remove();
@@ -750,6 +1043,9 @@
 
             var label = target.showLabel === false ? "" : target.name;
             document.getElementById('current-label').innerText = label;
+            // Show force expire button only on KM panels
+            var kmHudBtn = document.getElementById('km-force-expire-hud');
+            if (kmHudBtn) kmHudBtn.style.display = target.isKM ? 'inline-flex' : 'none';
             timeLeft = target.duration * 1000;
             document.querySelectorAll('.site-panel').forEach(pan => pan.classList.remove('active'));
             if(p) p.classList.add('active');
@@ -761,7 +1057,7 @@
 
         // ── SAVE (never persist AHD panels — they are rebuilt on load) ────────
         function save() { 
-            var savable = sites.filter(function(s){ return !s.isAHD && !s.isCWDPanel; });
+            var savable = sites.filter(function(s){ return !s.isAHD && !s.isCWDPanel && !s.isKM; });
             localStorage.setItem(STORAGE_KEY+'_SITES', JSON.stringify(savable)); 
             localStorage.setItem(STORAGE_KEY+'_TASKS', JSON.stringify(tasks)); 
             localStorage.setItem(STORAGE_KEY+'_SOUND', globalTone); 
@@ -809,7 +1105,13 @@
 
                 var labelCell;
                 var imgCell;
-                if (s.isCWDPanel) {
+                if (s.isKM) {
+                    var expDisplay = s.expiresAt ? new Date(s.expiresAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '24hr from issue';
+                    nameField = '<span class="ahd-row-text" style="color:#a78bfa;">📋 Key Messages · ' + (s.issuedAt || '') + '</span>';
+                    urlField = '<span style="color:#586069; font-size:0.78rem;">expires ' + expDisplay + '</span>';
+                    actionBtn = '<span style="color:#586069; font-size:0.8rem;">AUTO</span>';
+                    rovCell = '—'; labelCell = '—'; imgCell = '—';
+                } else if (s.isCWDPanel) {
                     nameField = '<span class="ahd-row-text">⚡ NCO CWD Status Panel</span>';
                     urlField = '<span style="color:#586069; font-size:0.78rem;">live — updates with CWD feed</span>';
                     actionBtn = '<span style="color:#586069; font-size:0.8rem;">AUTO</span>';
@@ -836,12 +1138,12 @@
                     imgCell = '<input type="checkbox" '+(s.forceImage?'checked':'')+' onchange="sites['+i+'].forceImage=this.checked;rebuildPanel('+i+')" title="Force Image Mode">';
                 }
 
-                sl.innerHTML += '<tr' + (s.isAHD ? ' style="background:rgba(0,229,255,0.04);"' : s.isCWDPanel ? ' style="background:rgba(0,229,255,0.02);"' : '') + '>' +
-                    '<td><input type="checkbox" '+(s.visible?'checked':'')+' '+(s.isAHD||s.isCWDPanel?'disabled':'')+' onchange="sites['+i+'].visible=this.checked;save()"></td>' +
+                sl.innerHTML += '<tr' + (s.isAHD ? ' style="background:rgba(0,229,255,0.04);"' : s.isKM ? ' style="background:rgba(167,139,250,0.04);"' : s.isCWDPanel ? ' style="background:rgba(0,229,255,0.02);"' : '') + '>' +
+                    '<td><input type="checkbox" '+(s.visible?'checked':'')+' '+(s.isAHD||s.isKM||s.isCWDPanel?'disabled':'')+' onchange="sites['+i+'].visible=this.checked;save()"></td>' +
                     '<td>'+nameField+'</td>' +
                     '<td>'+urlField+'</td>' +
-                    '<td>'+(s.isAHD ? '3' : s.isCWDPanel ? '15' : '<input type="number" style="width:60px" value="'+s.duration+'" onchange="sites['+i+'].duration=parseInt(this.value);save()">')+'</td>' +
-                    '<td>'+(s.isAHD||s.isCWDPanel ? '—' : '<input type="number" style="width:60px" value="'+(s.refresh||0)+'" onchange="sites['+i+'].refresh=parseInt(this.value);save()">')+'</td>' +
+                    '<td>'+(s.isAHD ? '3' : (s.isKM||s.isCWDPanel) ? '15' : '<input type="number" style="width:60px" value="'+s.duration+'" onchange="sites['+i+'].duration=parseInt(this.value);save()">')+'</td>' +
+                    '<td>'+(s.isAHD||s.isKM||s.isCWDPanel ? '—' : '<input type="number" style="width:60px" value="'+(s.refresh||0)+'" onchange="sites['+i+'].refresh=parseInt(this.value);save()">')+'</td>' +
                     '<td>'+rovCell+'</td>' +
                     '<td>'+labelCell+'</td>' +
                     '<td>'+imgCell+'</td>' +
@@ -1296,6 +1598,10 @@
         // Initial AHD sync (before frames so panels get created in first syncFrames pass)
         syncAHDPanels();
         scheduleAHDSync();
+        syncKMPanel();
+        scheduleKMSync();
+        // Init toggle button states
+        setTimeout(function(){ updateProductToggles(); }, 100);
 
         // Restore CWD panel toggle state
         if(cwdPanelEnabled) {
