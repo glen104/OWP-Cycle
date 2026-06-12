@@ -581,6 +581,10 @@
             setInterval(syncAHDPanels, 300000); // 5 min
         }
 
+        function scheduleKMSync() {
+            setInterval(syncKMPanel, 300000); // 5 min
+        }
+
         // ── PRODUCT PANEL HELPERS ─────────────────────────────────────────────
         function removeProductPanels(flag) {
             var currentSiteId = (currentIndex >= 0 && currentIndex < sites.length) ? sites[currentIndex].id : null;
@@ -614,12 +618,12 @@
                     if (Object.keys(expirations).length > 0) {
                         buildKMPanels(expirations, KM_ARCHIVE_BASE);
                     } else if (latestDate) {
-                        var issuanceMs = new Date(latestDate).getTime();
+                        var issuanceMs = parseKMDate(latestDate).getTime();
                         var expiryMs = issuanceMs + 86400000;
                         if (Date.now() < expiryMs) {
                             var filename = archiveList.length ? archiveList[archiveList.length-1] : null;
                             var imgUrl = filename ? KM_ARCHIVE_BASE + filename : KM_IMG_URL + '?cb=' + Date.now();
-                            var safeId = 'km_' + latestDate.replace(/[:.]/g, '-');
+                            var safeId = kmDateToSafeId(latestDate);
                             injectKMSite(safeId, imgUrl, latestDate, expiryMs);
                         } else {
                             removeProductPanels('isKM');
@@ -700,21 +704,24 @@
             removeProductPanels('isKM');
             validKMs.forEach(function(km) {
                 var rawTs = km.filename.replace('KM_','').replace('.png','');
-                var dtObj = new Date(rawTs);
-                var issuedLabel = isNaN(dtObj.getTime()) ? rawTs :
+                var dtObj = parseKMDate(rawTs);
+                var issuedLabel = (!dtObj || isNaN(dtObj.getTime())) ? rawTs :
                     dtObj.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' +
                     dtObj.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-                injectKMSite('km_' + rawTs.replace(/[:.]/g,'-'), archiveBase + km.filename, issuedLabel, new Date(km.expiresAt).getTime());
+                injectKMSite(kmDateToSafeId(rawTs), archiveBase + km.filename, issuedLabel, new Date(km.expiresAt).getTime());
             });
             syncFrames(); renderLists();
         }
 
         function injectKMSite(safeId, imgUrl, issuedAt, expiryMs) {
             var currentSiteId = (currentIndex >= 0 && currentIndex < sites.length) ? sites[currentIndex].id : null;
-            // Remove stale KM with same id
-            sites = sites.filter(function(s){ return s.id !== safeId; });
-            var el = document.getElementById('p-' + safeId);
-            if (el) el.remove();
+            // Remove ALL existing KM panels — only one KM active at a time
+            var oldKMs = sites.filter(function(s){ return s.isKM; });
+            oldKMs.forEach(function(s) {
+                var el = document.getElementById('p-' + s.id);
+                if (el) el.remove();
+            });
+            sites = sites.filter(function(s){ return !s.isKM; });
 
             // Insert after AHDs (which are after FHO)
             var insertAfter = sites.reduce(function(last, s, i){
@@ -723,7 +730,7 @@
 
             sites.splice(insertAfter + 1, 0, {
                 id: safeId, name: 'Key Messages',
-                url: imgUrl, duration: 15, refresh: 0,
+                url: imgUrl, duration: 5, refresh: 0,
                 lastSyncSlot: -1, visible: true,
                 isKM: true, locked: true, showLabel: false,
                 expiresAt: new Date(expiryMs).toISOString(),
@@ -744,8 +751,17 @@
             removeProductPanels('isKM');
         }
 
-        function scheduleKMSync() {
-            setInterval(syncKMPanel, 300000); // 5 min — same as AHD
+        // KM uses YYYY-MM-DDTHHMMSS (no colons) — parse to valid Date
+        function parseKMDate(str) {
+            if (!str) return null;
+            // 2026-06-12T152506 → treat as local time (no Z)
+            var m = str.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})(\d{2})(\d{2})$/);
+            if (m) return new Date(m[1] + 'T' + m[2] + ':' + m[3] + ':' + m[4]);
+            return new Date(str);
+        }
+
+        function kmDateToSafeId(str) {
+            return 'km_' + (str || '').replace(/[:.]/g, '-');
         }
 
         function toggleAHDEnabled() {
@@ -1142,7 +1158,7 @@
                     '<td><input type="checkbox" '+(s.visible?'checked':'')+' '+(s.isAHD||s.isKM||s.isCWDPanel?'disabled':'')+' onchange="sites['+i+'].visible=this.checked;save()"></td>' +
                     '<td>'+nameField+'</td>' +
                     '<td>'+urlField+'</td>' +
-                    '<td>'+(s.isAHD ? '3' : (s.isKM||s.isCWDPanel) ? '15' : '<input type="number" style="width:60px" value="'+s.duration+'" onchange="sites['+i+'].duration=parseInt(this.value);save()">')+'</td>' +
+                    '<td>'+(s.isAHD ? '3' : (s.isKM||s.isCWDPanel) ? '5' : '<input type="number" style="width:60px" value="'+s.duration+'" onchange="sites['+i+'].duration=parseInt(this.value);save()">')+'</td>' +
                     '<td>'+(s.isAHD||s.isKM||s.isCWDPanel ? '—' : '<input type="number" style="width:60px" value="'+(s.refresh||0)+'" onchange="sites['+i+'].refresh=parseInt(this.value);save()">')+'</td>' +
                     '<td>'+rovCell+'</td>' +
                     '<td>'+labelCell+'</td>' +
