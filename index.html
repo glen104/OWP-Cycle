@@ -224,6 +224,18 @@
                 <button class="btn" id="ahd-toggle-btn" onclick="toggleAHDEnabled()" style="font-size:0.75rem; padding:7px 16px;">✓ AHD ON</button>
                 <button class="btn" id="km-toggle-btn" onclick="toggleKMEnabled()" style="font-size:0.75rem; padding:7px 16px;">✓ KEY MSG ON</button>
             </div>
+            <div id="km-archive-panel" style="display:none; background:rgba(167,139,250,0.04); border:1px solid rgba(167,139,250,0.2); border-radius:12px; padding:16px 20px; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                    <span style="font-size:0.75rem; font-weight:900; color:#a78bfa; letter-spacing:2px; text-transform:uppercase;">📋 Key Messages — Last 12hr</span>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:0.75rem; color:#8b949e;">Preview size:</span>
+                        <input type="range" id="km-thumb-size" min="80" max="400" value="160" style="width:120px; accent-color:#a78bfa;" oninput="updateKMThumbSize(this.value)">
+                        <span id="km-thumb-size-label" style="font-size:0.75rem; color:#8b949e; width:40px;">160px</span>
+                    </div>
+                </div>
+                <div id="km-archive-list" style="display:flex; flex-wrap:wrap; gap:16px;"></div>
+                <div id="km-archive-empty" style="color:#586069; font-size:0.85rem; letter-spacing:1px; display:none;">No Key Messages issued in the last 12 hours.</div>
+            </div>
             <div style="background:rgba(255,255,255,0.03); padding:20px; border-radius:12px; display:flex; gap:10px;">
                 <input type="text" id="new-name" placeholder="Name" style="flex:1;">
                 <input type="text" id="new-url" placeholder="URL" style="flex:2;">
@@ -377,6 +389,10 @@
         var KM_ARCHIVE_BASE = 'https://www.weather.gov/images/owp/KM/Archive/';
         var ahdEnabled = (localStorage.getItem(STORAGE_KEY+'_AHD_ENABLED') !== 'false');
         var kmEnabled  = (localStorage.getItem(STORAGE_KEY+'_KM_ENABLED')  !== 'false');
+        var kmArchiveEntries = [];
+        var kmArchiveSelected = JSON.parse(localStorage.getItem(STORAGE_KEY+'_KM_ARCHIVE_SEL') || '[]');
+        var kmArchiveHidden = JSON.parse(localStorage.getItem(STORAGE_KEY+'_KM_ARCHIVE_HIDE') || '[]');
+        var kmThumbSize = parseInt(localStorage.getItem(STORAGE_KEY+'_KM_THUMB_SIZE') || '160');
 
         var defaultSites = [
             {id:100,name:"Flood Hazard Outlook",url:"https://www.weather.gov/images/owp/FHO/National/National_FHO.png",duration:10,refresh:0,lastSyncSlot:-1,visible:true,locked:true,pendingScheduledSync:false,refreshOnView:false,showLabel:false},
@@ -581,6 +597,100 @@
             setInterval(syncAHDPanels, 300000); // 5 min
         }
 
+        function deleteKMArchiveEntry(filename) {
+            if (!kmArchiveHidden) kmArchiveHidden = [];
+            kmArchiveHidden.push(filename);
+            localStorage.setItem(STORAGE_KEY+'_KM_ARCHIVE_HIDE', JSON.stringify(kmArchiveHidden));
+            // Also deselect if selected
+            var idx = kmArchiveSelected.indexOf(filename);
+            if (idx !== -1) {
+                kmArchiveSelected.splice(idx, 1);
+                localStorage.setItem(STORAGE_KEY+'_KM_ARCHIVE_SEL', JSON.stringify(kmArchiveSelected));
+            }
+            renderKMArchivePanel();
+            syncKMArchivePanels();
+        }
+
+        function updateKMThumbSize(val) {
+            kmThumbSize = parseInt(val);
+            localStorage.setItem(STORAGE_KEY+'_KM_THUMB_SIZE', kmThumbSize);
+            document.getElementById('km-thumb-size-label').innerText = val + 'px';
+            document.querySelectorAll('.km-archive-thumb').forEach(function(img) {
+                img.style.width = val + 'px';
+            });
+        }
+
+        function renderKMArchivePanel() {
+            var panel = document.getElementById('km-archive-panel');
+            var list  = document.getElementById('km-archive-list');
+            var empty = document.getElementById('km-archive-empty');
+            if (!panel || !list) return;
+            panel.style.display = kmEnabled ? 'block' : 'none';
+            if (!kmEnabled) return;
+            var slider = document.getElementById('km-thumb-size');
+            var sizeLabel = document.getElementById('km-thumb-size-label');
+            if (slider) slider.value = kmThumbSize;
+            if (sizeLabel) sizeLabel.innerText = kmThumbSize + 'px';
+            if (!kmArchiveEntries.length) {
+                list.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+            list.innerHTML = '';
+            var visibleEntries = kmArchiveEntries.filter(function(e){ return kmArchiveHidden.indexOf(e.filename) === -1; });
+            if (!visibleEntries.length) { empty.style.display = 'block'; return; }
+            visibleEntries.forEach(function(entry) {
+                var isSelected = kmArchiveSelected.indexOf(entry.filename) !== -1;
+                var dtObj = parseKMDate(entry.rawTs);
+                var label = (!dtObj || isNaN(dtObj.getTime())) ? entry.rawTs :
+                    dtObj.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' +
+                    dtObj.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+                var card = document.createElement('div');
+                card.style.cssText = 'display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;';
+                card.innerHTML =
+                    '<div style="position:relative;">' +
+                        '<img class="km-archive-thumb" src="' + KM_ARCHIVE_BASE + entry.filename + '" ' +
+                            'style="width:' + kmThumbSize + 'px; border-radius:6px; border:3px solid ' + (isSelected ? '#a78bfa' : '#30363d') + '; display:block; cursor:pointer;" ' +
+                            'onclick="toggleKMArchiveEntry(\'' + entry.filename + '\')" title="' + label + '">' +
+                        '<div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.75);border-radius:4px;padding:2px 6px;font-size:0.65rem;font-weight:900;color:white;letter-spacing:1px;pointer-events:none;">' + label + '</div>' +
+                        (isSelected ? '<div style="position:absolute;top:6px;right:6px;background:#a78bfa;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;pointer-events:none;">✓</div>' : '') +
+                        '<button onclick="deleteKMArchiveEntry(\'' + entry.filename + '\')" style="position:absolute;bottom:6px;right:6px;background:rgba(218,54,51,0.85);border:none;color:white;border-radius:4px;padding:2px 7px;font-size:0.7rem;font-weight:900;cursor:pointer;letter-spacing:1px;" title="Hide from panel">✕</button>' +
+                    '</div>' +
+                    '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.75rem;color:' + (isSelected ? '#a78bfa' : '#8b949e') + ';font-weight:' + (isSelected ? '900' : '400') + ';">' +
+                        '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' onchange="toggleKMArchiveEntry(\'' + entry.filename + '\')" style="accent-color:#a78bfa;"> In Rotation' +
+                    '</label>';
+                list.appendChild(card);
+            });
+        }
+
+        function toggleKMArchiveEntry(filename) {
+            var idx = kmArchiveSelected.indexOf(filename);
+            if (idx === -1) kmArchiveSelected.push(filename);
+            else kmArchiveSelected.splice(idx, 1);
+            localStorage.setItem(STORAGE_KEY+'_KM_ARCHIVE_SEL', JSON.stringify(kmArchiveSelected));
+            renderKMArchivePanel();
+            syncKMArchivePanels();
+        }
+
+        function syncKMArchivePanels() {
+            removeProductPanels('isKM');
+            if (!kmEnabled) return;
+            var hasSelected = kmArchiveSelected.length > 0;
+            if (!hasSelected) return; // no archive selections — main syncKMPanel handles current
+            kmArchiveEntries.forEach(function(entry) {
+                if (kmArchiveSelected.indexOf(entry.filename) !== -1) {
+                    var dtObj = parseKMDate(entry.rawTs);
+                    var issuanceMs = dtObj ? dtObj.getTime() : Date.now();
+                    var expiryMs = issuanceMs + 86400000;
+                    var label = (!dtObj || isNaN(dtObj.getTime())) ? entry.rawTs :
+                        dtObj.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' ' +
+                        dtObj.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+                    injectKMSite(kmDateToSafeId(entry.rawTs), KM_ARCHIVE_BASE + entry.filename, label, expiryMs);
+                }
+            });
+        }
+
         function scheduleKMSync() {
             setInterval(syncKMPanel, 300000); // 5 min
         }
@@ -620,13 +730,30 @@
                     } else if (latestDate) {
                         var issuanceMs = parseKMDate(latestDate).getTime();
                         var expiryMs = issuanceMs + 86400000;
-                        if (Date.now() < expiryMs) {
-                            var filename = archiveList.length ? archiveList[archiveList.length-1] : null;
-                            var imgUrl = filename ? KM_ARCHIVE_BASE + filename : KM_IMG_URL + '?cb=' + Date.now();
-                            var safeId = kmDateToSafeId(latestDate);
-                            injectKMSite(safeId, imgUrl, latestDate, expiryMs);
+                        if (Date.now() > expiryMs) { removeProductPanels('isKM'); return; }
+
+                        // Build 12hr archive entries for the manager panel
+                        var cutoff = Date.now() - (12 * 3600000);
+                        kmArchiveEntries = [];
+                        archiveList.forEach(function(filename) {
+                            var rawTs = filename.replace('KM_','').replace('.png','');
+                            var dtObj = parseKMDate(rawTs);
+                            if (dtObj && dtObj.getTime() > cutoff) {
+                                kmArchiveEntries.push({ filename: filename, rawTs: rawTs, dtMs: dtObj.getTime() });
+                            }
+                        });
+                        kmArchiveEntries.sort(function(a,b){ return a.dtMs - b.dtMs; });
+                        renderKMArchivePanel();
+
+                        // If archive selections active, use those; otherwise inject current
+                        if (kmArchiveSelected.length > 0) {
+                            syncKMArchivePanels();
                         } else {
-                            removeProductPanels('isKM');
+                            var latestFilename = archiveList.length ? archiveList[archiveList.length - 1] : null;
+                            var imgUrl = latestFilename ? KM_ARCHIVE_BASE + latestFilename : KM_IMG_URL + '?cb=' + Date.now();
+                            var safeId = kmDateToSafeId(latestDate);
+                            console.log('[KM] Injecting:', imgUrl);
+                            injectKMSite(safeId, imgUrl, latestDate, expiryMs);
                         }
                     } else {
                         console.log('[KM] JSON has no usable data — falling back');
@@ -748,13 +875,19 @@
         function forceExpireKM() {
             if (!confirm('Force expire the current Key Messages panel?')) return;
             localStorage.setItem(STORAGE_KEY + '_KM_FORCED', Date.now().toString());
+            localStorage.removeItem(STORAGE_KEY + '_KM_PENDING_SINCE');
+            localStorage.removeItem(STORAGE_KEY + '_KM_LATEST_DATE');
+            localStorage.removeItem(STORAGE_KEY + '_KM_ARCHIVE_HIDE');
+            localStorage.removeItem(STORAGE_KEY + '_KM_ARCHIVE_SEL');
+            kmArchiveHidden = [];
+            kmArchiveSelected = [];
             removeProductPanels('isKM');
         }
 
         // KM uses YYYY-MM-DDTHHMMSS (no colons) — parse to valid Date
         function parseKMDate(str) {
             if (!str) return null;
-            // 2026-06-12T152506 → treat as local time (no Z)
+            // 2026-06-12T152506 → local time (15:25 CDT = 3:25 PM local)
             var m = str.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})(\d{2})(\d{2})$/);
             if (m) return new Date(m[1] + 'T' + m[2] + ':' + m[3] + ':' + m[4]);
             return new Date(str);
@@ -776,6 +909,7 @@
             kmEnabled = !kmEnabled;
             localStorage.setItem(STORAGE_KEY + '_KM_ENABLED', kmEnabled);
             updateProductToggles();
+            renderKMArchivePanel();
             if (kmEnabled) syncKMPanel();
             else removeProductPanels('isKM');
         }
@@ -1317,7 +1451,7 @@
 
         // ── UI HELPERS ────────────────────────────────────────────────────────
         function switchTab(id,btn){ document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.getElementById("tab-"+id).classList.add('active'); btn.classList.add('active'); }
-        function toggleManager() { var v=document.getElementById('manager').style.display==='block'; document.getElementById('manager').style.display=v?'none':'block'; document.getElementById('modal-overlay').style.display=v?'none':'block'; if(!v)renderLists(); }
+        function toggleManager() { var v=document.getElementById('manager').style.display==='block'; document.getElementById('manager').style.display=v?'none':'block'; document.getElementById('modal-overlay').style.display=v?'none':'block'; if(!v){ renderLists(); renderKMArchivePanel(); } }
         function updateGlobalSound(v){ globalTone=v; save(); }
         function toggleTaskDates() {
             var tp = document.getElementById('task-type').value;
