@@ -581,13 +581,22 @@
                     var now = Date.now();
                     var ahd = data.ahd || {};
                     var expirations = (ahd.meta && ahd.meta.expirations) || {};
+                    var idsMap = (ahd.meta && ahd.meta.ids) || {};
+
+                    // Build reverse lookup: filename -> real AHD number (e.g. "20260100" -> 100)
+                    var filenameToNumber = {};
+                    Object.keys(idsMap).forEach(function(idKey) {
+                        var fn = idsMap[idKey];
+                        var numPart = idKey.length > 4 ? parseInt(idKey.substring(4), 10) : parseInt(idKey, 10);
+                        filenameToNumber[fn] = numPart;
+                    });
 
                     // Build list of currently valid AHD filenames, sorted by issuance time
                     var validAHDs = [];
                     Object.keys(expirations).forEach(function(filename) {
                         var expTime = new Date(expirations[filename]).getTime();
                         if (expTime > now) {
-                            validAHDs.push({ filename: filename, expTime: expTime, expiresAt: expirations[filename] });
+                            validAHDs.push({ filename: filename, expTime: expTime, expiresAt: expirations[filename], ahdNumber: filenameToNumber[filename] });
                         }
                     });
                     validAHDs.sort(function(a, b){ return a.filename.localeCompare(b.filename); });
@@ -633,7 +642,8 @@
                             showLabel: false,
                             expiresAt: ahd.expiresAt,
                             issuedAt: issuedLabel,
-                            filename: ahd.filename
+                            filename: ahd.filename,
+                            ahdNumber: ahd.ahdNumber
                         };
                         sites.splice(insertAfter + 1 + i, 0, newSite);
                     });
@@ -1120,7 +1130,7 @@
                 var remaining = expMs - nowMs;
                 var warnKey = 'ahd_expwarn_' + (s.filename || s.id);
                 if (remaining <= 2700000 && remaining > 0 && !firedTasks[warnKey]) {
-                    var ahdNum = idx + 1;
+                    var ahdNum = (s.ahdNumber !== undefined && s.ahdNumber !== null) ? s.ahdNumber : (idx + 1);
                     queueAlert(2, function() {
                         document.getElementById('task-alert-text').innerText = 'AHD #' + ahdNum + ' EXPIRES IN 45 MINUTES';
                         document.getElementById('alert-top-label').innerText = 'AHD EXPIRY NOTICE';
@@ -1136,6 +1146,7 @@
                 if ((site.isAHD || site.isKM) && site.expiresAt && nowMs > new Date(site.expiresAt).getTime()) {
                     var el = document.getElementById('p-' + site.id);
                     if (el) el.remove();
+                    delete firedTasks['ahd_expwarn_' + (site.filename || site.id)];
                     expiredAny = true;
                     return false;
                 }
@@ -1850,6 +1861,7 @@
             checkOperationalLogic();
             var today = (function(){ var n=new Date(); return n.getFullYear()+"-"+(n.getMonth()+1)+"-"+n.getDate(); })();
             Object.keys(firedTasks).forEach(function(k) {
+                if(k.indexOf('ahd_expwarn_') === 0) return; // AHD warnings cleared via real-time expiry, not date
                 if(k.indexOf("_"+today+"_") === -1) delete firedTasks[k];
             });
             // Prune expired tasks 1 hour after their last fire time
